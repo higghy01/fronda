@@ -1,4 +1,4 @@
-/* Fronda — app delle piante di casa.
+/* Rigo (prima Fronda) — app delle piante di casa.
    Tutto resta sul telefono: piante e foto in IndexedDB, impostazioni in localStorage. */
 "use strict";
 const $ = s => document.querySelector(s);
@@ -110,9 +110,13 @@ const ICO = {
 };
 const ring = (frac, label, big) => {
   const r = big ? 25 : 15, c = 2 * Math.PI * r, s = big ? 60 : 38, f = Math.max(0, Math.min(1, frac));
-  return `<svg class="ring" viewBox="0 0 ${s} ${s}" aria-hidden="true"><circle class="bg" cx="${s/2}" cy="${s/2}" r="${r}"/><circle class="fg" cx="${s/2}" cy="${s/2}" r="${r}" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - f)}" transform="rotate(-90 ${s/2} ${s/2})"/><text x="${s/2}" y="${s/2}">${label}</text></svg>`;
+  return `<svg class="ring" viewBox="0 0 ${s} ${s}" aria-hidden="true"><circle class="bg" cx="${s/2}" cy="${s/2}" r="${r}"/><circle class="fg" cx="${s/2}" cy="${s/2}" r="${r}" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - f)}" style="--c:${c}" transform="rotate(-90 ${s/2} ${s/2})"/><text x="${s/2}" y="${s/2}">${label}</text></svg>`;
 };
 const semeDi = p => { let h = 0; for (const ch of p.id) h = (h * 31 + ch.charCodeAt(0)) % 997; return h + 1; };
+// ogni stanza ha il suo colore (sempre lo stesso), così l'elenco non è tutto verde
+const TINTE = ["#E8833A", "#3A8DDE", "#B05CC8", "#D9A21B", "#E0577A", "#2BA59A", "#7A6FE0"];
+// colori dati in ordine alfabetico delle stanze: due stanze vicine non hanno mai lo stesso colore
+const tintaStanza = s => { const i = stanze().indexOf(String(s || "").trim()); return TINTE[(i < 0 ? 0 : i) % TINTE.length]; };
 const pic = p => p.thumb ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : art(specie(p).art, specie(p).c, semeDi(p));
 
 /* ---------- Schermata principale ---------- */
@@ -126,7 +130,7 @@ function render() {
     main.innerHTML = `<section class="empty">
       <div class="ill">${art("monstera", SPECIE.monstera.c, 3)}</div>
       <h2>Iniziamo dalla prima pianta</h2>
-      <p>Fai una foto, scegli il tipo e Fronda ti dice quando annaffiarla.</p>
+      <p>Fai una foto, scegli il tipo e Rigo ti dice quando annaffiarla.</p>
       <button class="btn water" id="empty-add" style="max-width:280px">Aggiungi una pianta</button>
     </section>`;
     $("#empty-add").onclick = () => formPianta();
@@ -142,14 +146,14 @@ function render() {
   if (filtro && !elencoStanze.includes(filtro)) filtro = "";
 
   main.innerHTML = `
-  <section class="today">
+  <section class="today" data-k="today">
     ${ring(1 - oggi.length / tot, `${tot - oggi.length}/${tot}`, true).replace('class="ring"', 'class="ring gauge"')}
     <div><b>${oggi.length ? `${oggi.length === 1 ? "Una pianta ha" : oggi.length + " piante hanno"} sete oggi` : "Tutte a posto oggi"}</b>
     <span>${oggi.length ? "Sono qui sotto, in ordine" : domani.length ? `Domani: ${esc(domani.slice(0, 3).map(p => p.nome).join(", "))}${domani.length > 3 ? ` e altre ${domani.length - 3}` : ""}` : "Nessuna annaffiatura domani"}${stagioneInv() ? " · ritmo invernale" : ""}</span></div>
     <svg class="waves" viewBox="0 0 400 10" preserveAspectRatio="none" aria-hidden="true"><path d="M0 6 Q25 0 50 6 T100 6 T150 6 T200 6 T250 6 T300 6 T350 6 T400 6 V10 H0z" fill="var(--water-soft)"/></svg>
   </section>
 
-  ${oggi.length ? `<div class="section-h"><h2>Da annaffiare</h2><small>${oggi.length}</small></div>
+  ${oggi.length ? `<div class="section-h" data-k="h-oggi"><h2>Da annaffiare</h2><small>${oggi.length}</small></div>
   <div class="thirsty" id="thirsty">
     ${oggi.map((p, i) => `<div class="trow" style="--i:${i}" data-id="${esc(p.id)}">
       <button class="mini" data-open="${esc(p.id)}" aria-label="Apri ${esc(p.nome)}">${pic(p)}</button>
@@ -159,17 +163,17 @@ function render() {
     ${oggi.length > 1 ? `<button class="allbtn" id="water-all">Le ho annaffiate tutte</button>` : ""}
   </div>` : ""}
 
-  <div class="section-h"><h2>In casa</h2><small>${tot} ${tot === 1 ? "pianta" : "piante"}</small></div>
-  ${tot > 6 || elencoStanze.length > 1 ? `<div class="tools" style="margin-top:0;margin-bottom:12px">
+  <div class="section-h" data-k="h-casa"><h2>In casa</h2><small>${tot} ${tot === 1 ? "pianta" : "piante"}</small></div>
+  ${tot > 6 || elencoStanze.length > 1 ? `<div class="tools" data-k="tools" style="margin-top:0;margin-bottom:12px">
     ${tot > 6 ? `<div class="search">${ICO.search}<input id="cerca" type="search" placeholder="Cerca per nome, tipo o stanza" value="${esc(cerca)}" autocomplete="off" enterkeyhint="search"></div>` : ""}
-    ${elencoStanze.length > 1 ? `<div class="rooms">${["", ...elencoStanze].map(s => `<button class="chip-f" data-room="${esc(s)}" aria-pressed="${s === filtro}">${s ? esc(s) : "Tutte"}</button>`).join("")}</div>` : ""}
+    ${elencoStanze.length > 1 ? `<div class="rooms">${["", ...elencoStanze].map(s => `<button class="chip-f" data-room="${esc(s)}" aria-pressed="${s === filtro}"${s ? ` style="--t:${tintaStanza(s)}"` : ""}>${s ? `<i class="dot"></i>${esc(s)}` : "Tutte"}</button>`).join("")}</div>` : ""}
   </div>` : ""}
   <div class="grid" id="grid">${griglia(ordinate)}</div>`;
 
   // scrivendo nella ricerca cambia solo l'elenco: il campo resta lo stesso (suggerimenti e correzione di iOS non si interrompono)
   const inp = $("#cerca");
   if (inp) inp.oninput = e => { cerca = e.target.value; $("#grid").innerHTML = griglia(ordinate); };
-  $$("[data-room]").forEach(b => b.onclick = () => { filtro = b.dataset.room; render(); });
+  $$("[data-room]").forEach(b => b.onclick = () => { filtro = b.dataset.room; tocco(); morbido(render); });
   const all = $("#water-all");
   if (all) all.onclick = () => annaffiaTutte(oggi);
 }
@@ -179,18 +183,53 @@ function griglia(ordinate) {
   const visibili = ordinate.filter(p => (!filtro || (p.stanza || "").trim() === filtro) &&
     (!q || p.nome.toLowerCase().includes(q) || specie(p).n.toLowerCase().includes(q) || (p.stanza || "").toLowerCase().includes(q)));
   return visibili.map((p, i) => { const m = mancano(p);
-    return `<button class="card" style="--i:${Math.min(i, 12)}" data-open="${esc(p.id)}">
-      <div class="pic">${pic(p)}${m <= 1 ? `<span class="badge ${m <= 0 ? "due" : "soon"}">${m <= 0 ? "Ha sete" : "Domani"}</span>` : ""}</div>
-      <div class="meta"><div class="txt"><div class="name">${esc(p.nome)}</div><div class="kind">${esc(p.stanza || specie(p).n)}</div></div>${ring(Math.max(0, m) / ogni(p), m <= 0 ? "0g" : m + "g")}</div>
+    return `<button class="card" style="--i:${Math.min(i, 12)}" data-open="${esc(p.id)}" data-k="c-${esc(p.id)}">
+      <div class="pic" style="--tint:${specie(p).c[1]}">${pic(p)}${m <= 1 ? `<span class="badge ${m <= 0 ? "due" : "soon"}">${m <= 0 ? "Ha sete" : "Domani"}</span>` : ""}</div>
+      <div class="meta"><div class="txt"><div class="name">${esc(p.nome)}</div><div class="kind">${p.stanza ? `<i class="dot" style="--t:${tintaStanza(p.stanza)}"></i>` : ""}${esc(p.stanza || specie(p).n)}</div></div>${ring(Math.max(0, m) / ogni(p), m <= 0 ? "0g" : m + "g")}</div>
     </button>`; }).join("") || `<div class="nores">Nessuna pianta trovata</div>`;
 }
 
 $("#main").addEventListener("click", e => {
   const w = e.target.closest("[data-water]");
-  if (w) { const p = piante.find(x => x.id === w.dataset.water); const row = w.closest(".trow"); if (!p || row.classList.contains("gone")) return; row.classList.add("gone"); setTimeout(() => annaffia(p), 280); return; }
+  if (w) { const p = piante.find(x => x.id === w.dataset.water); const row = w.closest(".trow"); if (!p || row.classList.contains("gone")) return; tocco(); row.classList.add("gone"); setTimeout(() => annaffia(p), 280); return; }
   const o = e.target.closest("[data-open]");
   if (o) scheda(o.dataset.open);
 });
+
+/* ---------- Movimenti morbidi ----------
+   Prima di ridisegnare si segna dove sta ogni pezzo; dopo, ogni pezzo scivola dal posto vecchio al nuovo
+   (come sull'iPhone quando una lista cambia), quelli nuovi compaiono piano. */
+const MOLLA = "cubic-bezier(.32,.72,0,1)";
+const pocoMoto = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+function morbido(fn) {
+  if (pocoMoto() || !Element.prototype.animate) return fn();
+  const prima = new Map();
+  $$("#main [data-k]").forEach(el => prima.set(el.dataset.k, el.getBoundingClientRect()));
+  fn();
+  $$("#main [data-k]").forEach(el => {
+    const r0 = prima.get(el.dataset.k), r1 = el.getBoundingClientRect();
+    if (!r0) { el.animate([{ opacity: 0, transform: "scale(.94)" }, { opacity: 1, transform: "none" }], { duration: 420, easing: MOLLA, delay: 80, fill: "backwards" }); return; }
+    const dx = r0.left - r1.left, dy = r0.top - r1.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    el.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: "none" }], { duration: 520, easing: MOLLA });
+  });
+}
+
+/* Un piccolo "tic" sotto le dita: vibrazione dove c'è, e su iPhone (iOS 18) il trucco dell'interruttore */
+const tocco = (() => {
+  let lab;
+  return () => {
+    try {
+      if (navigator.vibrate) { navigator.vibrate(10); return; }
+      if (!lab) {
+        lab = document.createElement("label"); lab.setAttribute("aria-hidden", "true"); lab.style.display = "none";
+        const i = document.createElement("input"); i.type = "checkbox"; i.setAttribute("switch", ""); i.tabIndex = -1;
+        lab.appendChild(i); document.body.appendChild(lab);
+      }
+      lab.click();
+    } catch (e) {}
+  };
+})();
 
 /* ---------- Annaffiare ---------- */
 function annaffia(p, dalla) {
@@ -198,17 +237,17 @@ function annaffia(p, dalla) {
   p.last = now();
   p.storia = [p.last, ...p.storia].slice(0, 60);
   salva(p);
-  render();
-  if (navigator.vibrate) navigator.vibrate(12);
-  toast(`${p.nome} ringrazia`, () => { Object.assign(p, prima); salva(p); render(); if (schedaAperta === p.id) scheda(p.id, true); });
+  morbido(render);
+  toast(`${p.nome} ringrazia`, () => { Object.assign(p, prima); salva(p); morbido(render); if (schedaAperta === p.id) scheda(p.id, true); });
 }
 function annaffiaTutte(lista) {
   const prima = lista.map(p => ({ p, last: p.last, storia: [...p.storia] }));
+  tocco();
   $$(".trow").forEach((r, i) => setTimeout(() => r.classList.add("gone"), i * 50));
   setTimeout(() => {
     lista.forEach(p => { p.last = now(); p.storia = [p.last, ...p.storia].slice(0, 60); salva(p); });
-    render();
-    toast(`${lista.length} piante annaffiate`, () => { prima.forEach(x => { x.p.last = x.last; x.p.storia = x.storia; salva(x.p); }); render(); });
+    morbido(render);
+    toast(`${lista.length} piante annaffiate`, () => { prima.forEach(x => { x.p.last = x.last; x.p.storia = x.storia; salva(x.p); }); morbido(render); });
   }, 280 + lista.length * 50);
 }
 
@@ -221,13 +260,21 @@ function apri(html, label) {
   sh.scrollTop = 0;
   if (!foglioAperto) { history.pushState({ foglio: 1 }, ""); foglioAperto = true; }
   $("#scrim").classList.add("on");
+  sfondo(true);
   requestAnimationFrame(() => sh.classList.add("on"));
+}
+/* Con un foglio aperto la pagina dietro si rimpicciolisce un po', come le schede dell'iPhone */
+function sfondo(on) {
+  const a = $("#app"), r = document.documentElement;
+  if (on && !r.classList.contains("aperto")) a.style.transformOrigin = `50% ${scrollY + innerHeight / 2}px`;
+  r.classList.toggle("aperto", on);
 }
 function chiudiFoglio() { if (foglioAperto) history.back(); }
 function _chiudiFoglio() {
   foglioAperto = false; schedaAperta = null; liberaFoto();
   $("#sheet").classList.remove("on");
   $("#scrim").classList.remove("on");
+  sfondo(false);
 }
 window.addEventListener("popstate", () => {
   if (viewerAperto) { viewerAperto = false; $("#viewer").classList.remove("on"); return; }
@@ -238,17 +285,23 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") { if (viewer
 
 /* Trascinare giù per chiudere */
 (() => {
-  const sh = $("#sheet"); let y0 = null, dy = 0;
-  sh.addEventListener("touchstart", e => { if (sh.scrollTop <= 0 && !e.target.closest("input,textarea,select,.sp-list")) { y0 = e.touches[0].clientY; dy = 0; } else y0 = null; }, { passive: true });
+  const sh = $("#sheet"), root = document.documentElement; let y0 = null, dy = 0, t0 = 0, vel = 0, yPrima = 0;
+  sh.addEventListener("touchstart", e => { if (sh.scrollTop <= 0 && !e.target.closest("input,textarea,select,.sp-list")) { y0 = yPrima = e.touches[0].clientY; dy = 0; vel = 0; t0 = e.timeStamp; } else y0 = null; }, { passive: true });
   sh.addEventListener("touchmove", e => {
     if (y0 === null) return;
-    dy = e.touches[0].clientY - y0;
-    if (dy > 0) { e.preventDefault(); sh.classList.add("drag"); sh.style.transform = `translateY(${dy}px)`; }
+    const y = e.touches[0].clientY;
+    dy = y - y0;
+    const dt = Math.max(1, e.timeStamp - t0); vel = (y - yPrima) / dt; yPrima = y; t0 = e.timeStamp;
+    if (dy > 0) {
+      e.preventDefault(); sh.classList.add("drag"); root.classList.add("trascina");
+      sh.style.transform = `translateY(${dy}px)`;
+      root.style.setProperty("--p", Math.max(0, 1 - dy / Math.max(300, sh.offsetHeight)).toFixed(3));
+    }
   }, { passive: false });
   sh.addEventListener("touchend", () => {
     if (y0 === null) return;
-    sh.classList.remove("drag"); sh.style.transform = "";
-    if (dy > 110) chiudiFoglio();
+    sh.classList.remove("drag"); root.classList.remove("trascina"); sh.style.transform = ""; root.style.removeProperty("--p");
+    if (dy > 110 || (dy > 30 && vel > .6)) chiudiFoglio();
     y0 = null;
   });
 })();
@@ -336,7 +389,7 @@ function apriFoto(p, f) {
 function animaAcqua(p, e) {
   const b = e.currentTarget, r = b.getBoundingClientRect(), rp = document.createElement("span"), sz = Math.max(r.width, r.height) * 2;
   rp.className = "ripple"; rp.style.cssText = `width:${sz}px;height:${sz}px;left:${e.clientX - r.left - sz / 2}px;top:${e.clientY - r.top - sz / 2}px`;
-  b.appendChild(rp); setTimeout(() => rp.remove(), 700);
+  b.appendChild(rp); setTimeout(() => rp.remove(), 700); tocco();
   const wb = $("#wb"), rg = wb.querySelector(".ring"); wb.style.position = "relative";
   const rr = rg.getBoundingClientRect(), wr = wb.getBoundingClientRect();
   const cx = rr.left - wr.left + rr.width / 2, cy = rr.top - wr.top + rr.height / 2;
@@ -483,7 +536,7 @@ function formPianta(p) {
       let ft = null;
       if (st.foto) { ft = { id: nuovoId(), pianta: np.id, t: now(), blob: st.foto.blob }; np.coverId = ft.id; np.thumb = st.foto.thumb; }
       await DB.salvaNuova(np, ft); piante.push(np); aggiornaPromemoria();
-      chiudiFoglio(); render(); toast("Benvenuta in casa!");
+      chiudiFoglio(); tocco(); morbido(render); toast("Benvenuta in casa!");
     } else {
       // il nome latino del riconoscimento vale solo per il tipo per cui è stato trovato
       const nuovi = { nome, sp: st.sp, sci: st.sp === p.sp ? p.sci : (st.sci || ""), stanza, e: st.e, i: st.i, note };
@@ -533,9 +586,11 @@ function impostazioni() {
   apri(`
     <h3 style="margin-top:4px">Impostazioni</h3>
     ${installata ? "" : `<div class="tip" style="margin-top:14px"><b>Usala come un'app</b>In Safari tocca Condividi, poi "Aggiungi alla schermata Home". Così si apre a tutto schermo, anche senza rete.</div>`}
+    <div class="group">
     <div class="switch"><div><b>Ritmo stagionale</b><small>Da ottobre a marzo usa i giorni "d'inverno", perché le piante bevono meno</small></div><input type="checkbox" id="sw-stag" ${imp.stagioni ? "checked" : ""} aria-label="Ritmo stagionale"></div>
     <div class="switch"><div><b>Promemoria del mattino</b><small>${window.FIREBASE_PROGETTO ? "Un avviso sul telefono, solo nei giorni in cui una pianta ha sete" : "In arrivo: un avviso al mattino quando una pianta ha sete"}</small></div><input type="checkbox" id="sw-prom" ${imp.promemoria ? "checked" : ""} ${window.FIREBASE_PROGETTO ? "" : "disabled"} aria-label="Promemoria del mattino"></div>
-    <div class="field" id="ora-box" ${imp.promemoria ? "" : "hidden"} style="margin-top:10px"><label for="sel-ora">A che ora</label><select id="sel-ora">${Array.from({ length: 15 }, (_, i) => String(i + 7).padStart(2, "0") + ":00").map(o => `<option ${o === imp.ora ? "selected" : ""}>${o}</option>`).join("")}</select></div>
+    <div class="switch ora" id="ora-box" ${imp.promemoria ? "" : "hidden"}><label for="sel-ora"><b>A che ora</b></label><select id="sel-ora">${Array.from({ length: 15 }, (_, i) => String(i + 7).padStart(2, "0") + ":00").map(o => `<option ${o === imp.ora ? "selected" : ""}>${o}</option>`).join("")}</select></div>
+    </div>
     <div id="prom-msg"></div>
     <div class="block-h">Copia di sicurezza</div>
     <p class="note" style="margin-top:0">Le piante e le foto sono salvate solo su questo telefono. Ogni tanto fai una copia e tienila in File o su iCloud Drive.</p>
@@ -546,7 +601,7 @@ function impostazioni() {
       <div id="b-conf"></div>
     </div>
     <button class="btn water" id="ok-set" style="margin-top:20px">Fatto</button>
-    <p class="about">Fronda · versione 3 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 4 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `, "Impostazioni");
   $("#sw-stag").onchange = e => { imp.stagioni = e.target.checked; salvaImp(); render(); aggiornaPromemoria(); };
   $("#sw-prom").onchange = async e => {
@@ -572,10 +627,10 @@ async function esportaCopia() {
     const foto = await DB.all("foto");
     const dati = { app: "fronda", versione: 1, creata: new Date().toISOString(), impostazioni: imp, piante,
       foto: await Promise.all(foto.map(async f => ({ id: f.id, pianta: f.pianta, t: f.t, data: await blobInData(f.blob) }))) };
-    const nome = `fronda-copia-${new Date().toISOString().slice(0, 10)}.json`;
+    const nome = `rigo-copia-${new Date().toISOString().slice(0, 10)}.json`;
     const file = new File([JSON.stringify(dati)], nome, { type: "application/json" });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: "Copia di Fronda" }).catch(() => {});
+      await navigator.share({ files: [file], title: "Copia di Rigo" }).catch(() => {});
     } else {
       const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = nome;
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
@@ -588,7 +643,7 @@ function chiediRipristino(file) {
   const r = new FileReader();
   r.onload = () => {
     let d; try { d = JSON.parse(r.result); } catch (e) {}
-    if (!d || d.app !== "fronda" || !Array.isArray(d.piante)) { toast("Questo file non è una copia di Fronda"); return; }
+    if (!d || d.app !== "fronda" || !Array.isArray(d.piante)) { toast("Questo file non è una copia di Rigo"); return; }
     $("#b-conf").innerHTML = `<div class="confirm"><p>La copia ha <b>${d.piante.length} piante</b> e ${d.foto?.length || 0} foto. Sostituisce tutto quello che c'è adesso sul telefono.</p>
       <div class="row2"><button class="btn ghost" id="r-no">Annulla</button><button class="btn warn" id="r-si">Ripristina</button></div></div>`;
     $("#r-no").onclick = () => $("#b-conf").innerHTML = "";
@@ -652,9 +707,9 @@ const b64InByte = s => { const p = "=".repeat((4 - s.length % 4) % 4); const b =
 async function attivaPromemoria() {
   const installata = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window))
-    return installata ? "Questo telefono non riceve avvisi dalle app web: serve iOS 16.4 o più recente." : "Prima aggiungi Fronda alla schermata Home (Safari → Condividi → \"Aggiungi alla schermata Home\"), poi aprila da lì e accendi il promemoria.";
+    return installata ? "Questo telefono non riceve avvisi dalle app web: serve iOS 16.4 o più recente." : "Prima aggiungi Rigo alla schermata Home (Safari → Condividi → \"Aggiungi alla schermata Home\"), poi aprila da lì e accendi il promemoria.";
   try {
-    if (await Notification.requestPermission() !== "granted") return "Il telefono non ha dato il permesso. Puoi darlo da Impostazioni → Notifiche → Fronda.";
+    if (await Notification.requestPermission() !== "granted") return "Il telefono non ha dato il permesso. Puoi darlo da Impostazioni → Notifiche → Rigo.";
     const r = await fetch(FS("config/pubblica"));
     if (!r.ok) return "Il servizio dei promemoria non è ancora pronto. Riprova più tardi.";
     const chiave = (await r.json()).fields?.vapid?.stringValue;
@@ -682,9 +737,9 @@ async function spegniPromemoria() {
 let tt;
 function toast(t, annulla) {
   const el = $("#toast");
-  el.innerHTML = esc(t) + (annulla ? ` <button id="t-undo" style="color:var(--water-soft);font-weight:700;margin-left:8px;pointer-events:auto">Annulla</button>` : "");
+  el.innerHTML = esc(t) + (annulla ? ` <button id="t-undo">Annulla</button>` : "");
   el.style.pointerEvents = annulla ? "auto" : "none";
-  if (annulla) $("#t-undo").onclick = () => { annulla(); el.classList.remove("on"); };
+  if (annulla) $("#t-undo").onclick = () => { tocco(); annulla(); el.classList.remove("on"); };
   el.classList.add("on"); clearTimeout(tt); tt = setTimeout(() => el.classList.remove("on"), annulla ? 4500 : 2200);
 }
 
@@ -692,6 +747,22 @@ function toast(t, annulla) {
 document.addEventListener("gesturestart", e => e.preventDefault());
 document.addEventListener("visibilitychange", () => { if (!document.hidden && piante.length) render(); });
 $("#open-add").onclick = () => formPianta();
+
+/* Titolo grande che, scorrendo, diventa la barra piccola in alto (come nelle app Apple);
+   il pulsante Aggiungi si fa tondo quando si scorre giù e torna largo quando si risale */
+(() => {
+  const nav = $("#navbar"), fab = $("#open-add"), tit = $("#titolo");
+  if ("IntersectionObserver" in window) new IntersectionObserver(([e]) => nav.classList.toggle("on", !e.isIntersecting), { rootMargin: "-8px 0px 0px 0px" }).observe(tit);
+  let ultimo = scrollY, attesa = false;
+  addEventListener("scroll", () => {
+    if (attesa) return; attesa = true;
+    requestAnimationFrame(() => {
+      const y = scrollY;
+      if (Math.abs(y - ultimo) > 6) { fab.classList.toggle("small", y > ultimo && y > 120); ultimo = y; }
+      attesa = false;
+    });
+  }, { passive: true });
+})();
 $("#open-settings").onclick = impostazioni;
 
 (async () => {

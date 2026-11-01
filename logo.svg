@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#48B36A"/><stop offset="1" stop-color="#1D6B3B"/></linearGradient>
+<radialGradient id="h" cx=".25" cy=".15" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<linearGradient id="d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7CCBFF"/><stop offset="1" stop-color="#1E88F0"/></linearGradient>
+<linearGradient id="l" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#E9FBEA"/><stop offset="1" stop-color="#B8EDC2"/></linearGradient>
+</defs>
+<rect width="100" height="100" fill="url(#g)"/>
+<rect width="100" height="100" fill="url(#h)"/>
+<!-- la r: gambo -->
+<path d="M38 40 V72" stroke="#F6FCF4" stroke-width="10" stroke-linecap="round" fill="none"/>
+<!-- la spalla della r è una foglia -->
+<path d="M38 46 C40 33 52 26 68 28 C66 41 54 49 38 46 Z" fill="url(#l)"/>
+<path d="M40 45 C48 40 56 35 64 31" stroke="#2E8B4E" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".55"/>
+<!-- la goccia che cade dalla punta -->
+<path d="M68 39 C68 39 75 47.5 75 52 A7 7 0 0 1 61 52 C61 47.5 68 39 68 39 Z" fill="url(#d)"/>
+<path d="M65 51.5 a3 3 0 0 0 2 3.2" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".75"/>
+<!-- terra -->
+<path d="M28 76 Q38 73 48 76" stroke="#F6FCF4" stroke-opacity=".45" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+</svg>

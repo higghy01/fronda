@@ -223,3 +223,126 @@ h1{font-size:34px;font-weight:700;line-height:1.05;margin-top:4px}
 }
 .still .card,.still .trow{animation:none}
 .trow .t{background:none;padding:0}
+
+/* ===== Versione 4: stile Apple =====
+   Caratteri di sistema dell'iPhone (SF Pro, titoli arrotondati), colori più vivi, vetro sfocato,
+   pagina che si rimpicciolisce dietro i fogli, molle morbide senza rimbalzi esagerati. */
+:root{
+  --display:ui-rounded,"SF Pro Rounded","Bricolage Grotesque","Avenir Next",system-ui,sans-serif;
+  --body:-apple-system,"SF Pro Text","Figtree","Helvetica Neue","Segoe UI",system-ui,sans-serif;
+  --bg:#F2F5EF;--surface:#FFFFFF;--surface-2:#E9EFE5;--line:#DCE4D8;
+  --leaf:#2E8B4E;--water:#0A7AFF;--water-soft:#E1EEFF;--warn:#F2662A;
+  --ios:cubic-bezier(.32,.72,0,1);
+  --spring:cubic-bezier(.34,1.3,.64,1);
+  --glass:rgba(248,250,246,.72);
+  --shadow:0 .5px 0 rgba(23,39,29,.04),0 6px 20px rgba(23,39,29,.06);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0B120D;--surface:#162019;--surface-2:#1E2B22;--line:#26352B;--water:#3D9BFF;--water-soft:#132B47;--leaf:#5CC27A;--warn:#FF8A4C;--glass:rgba(16,24,18,.72)}}
+:root[data-theme="dark"]{--bg:#0B120D;--surface:#162019;--surface-2:#1E2B22;--line:#26352B;--water:#3D9BFF;--water-soft:#132B47;--leaf:#5CC27A;--warn:#FF8A4C;--glass:rgba(16,24,18,.72)}
+
+html{transition:background-color .45s var(--ios)}
+body{background:transparent;padding:0;-webkit-font-smoothing:antialiased}
+.app{max-width:none;margin:0;min-height:100vh;min-height:100dvh;background:var(--bg);
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px),calc((100% - 520px)/2)) calc(env(safe-area-inset-bottom,0px) + 120px) max(16px,env(safe-area-inset-left,0px),calc((100% - 520px)/2));
+  transition:transform .5s var(--ios),border-radius .5s var(--ios);--p:1}
+h1{font-size:34px;letter-spacing:-.022em}
+.date{letter-spacing:.04em;font-size:12.5px}
+h1,h2,h3,.card .name,.today b,.waterbox b,.block-h{letter-spacing:-.015em}
+
+/* Barra piccola in vetro che compare scorrendo */
+.navbar{position:fixed;left:0;right:0;top:0;z-index:6;height:calc(env(safe-area-inset-top,0px) + 44px);padding-top:env(safe-area-inset-top,0px);
+  display:grid;place-items:center;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:.5px solid transparent;opacity:0;pointer-events:none;transition:opacity .25s ease,border-color .25s}
+.navbar span{font-family:var(--display);font-weight:700;font-size:17px;transform:translateY(6px);transition:transform .35s var(--ios)}
+.navbar.on{opacity:1;border-color:var(--line)}
+.navbar.on span{transform:none}
+
+/* Pagina dietro i fogli */
+html.aperto{background:#000}
+html.aperto .app{transform:translateY(calc(env(safe-area-inset-top,0px) + 8px)) scale(.92);border-radius:22px;overflow:hidden}
+html.trascina .app{transition:none;transform:translateY(calc((env(safe-area-inset-top,0px) + 8px) * var(--p))) scale(calc(1 - .08 * var(--p)))}
+html.aperto .navbar{opacity:0}
+html.aperto .fab{transform:translateY(140%) scale(.9)}
+.scrim{background:rgba(0,0,0,.28);backdrop-filter:none;-webkit-backdrop-filter:none;transition:opacity .45s var(--ios)}
+html.trascina .scrim{transition:none;opacity:var(--p)}
+
+/* Fogli: come quelli dell'iPhone, senza rimbalzo in basso */
+.sheet{border-radius:14px 14px 0 0;transition:transform .55s var(--ios);box-shadow:0 -1px 0 rgba(0,0,0,.04),0 -10px 40px rgba(0,0,0,.12);will-change:transform}
+.sheet:not(.on){transition:transform .42s var(--ios),visibility 0s .42s}
+.grab{width:36px;height:5px;background:var(--ink-soft);opacity:.3;margin-bottom:14px}
+
+/* Pressione: tutto ciò che si tocca si abbassa un poco e torna su con una molla */
+.card,.trow,.btn,.wbtn,.chip-f,.round-btn,.fab,.sp-list button,.guess button,.album .ph,.stepper button,.allbtn{transition:transform .45s var(--spring),background-color .25s,color .25s,border-color .25s,box-shadow .3s}
+.card:active,.album .ph:active{transform:scale(.96);transition-duration:.12s}
+.btn:active,.wbtn:active,.chip-f:active,.sp-list button:active,.guess button:active,.stepper button:active,.allbtn:active{transform:scale(.96);transition-duration:.1s}
+.round-btn:active{transform:scale(.88);transition-duration:.1s}
+.fab:active{transform:scale(.92);transition-duration:.1s}
+
+/* Card e riepilogo */
+.today{border-radius:24px;background:linear-gradient(135deg,var(--surface) 55%,var(--water-soft))}
+.today .gauge .fg{stroke:var(--water)}
+.card{border-radius:24px;padding:8px 8px 12px}
+.card .pic{border-radius:18px;background:color-mix(in srgb,var(--tint,var(--leaf)) 16%,var(--surface-2))}
+.card .kind{display:flex;align-items:center;gap:5px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--t,var(--leaf));flex:none}
+.badge{-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);background:var(--glass)}
+.badge.due{background:var(--warn);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--warn) 55%,transparent)}50%{box-shadow:0 0 0 6px transparent}}
+.ring .fg{animation:ringin 1.2s var(--ios) both}
+@keyframes ringin{from{stroke-dashoffset:var(--c)}}
+.still .ring .fg{animation:none}
+.trow{border-radius:18px}
+.trow.gone{opacity:0;transform:translateX(40px) scale(.94);transition:opacity .3s ease,transform .35s var(--ios)}
+.wbtn{border-radius:99px;padding:0 16px}
+.allbtn{border-radius:12px}
+
+/* Filtri per stanza: ognuna col suo colore */
+.chip-f{display:inline-flex;align-items:center;gap:6px;border-color:transparent;background:var(--surface);box-shadow:var(--shadow)}
+.chip-f[aria-pressed="true"]{background:var(--t,var(--ink));border-color:transparent;color:#fff}
+.chip-f[aria-pressed="true"] .dot{background:#fff}
+.search input{border:0;background:var(--surface-2);border-radius:12px;height:40px}
+.search svg{top:10px}
+
+/* Pulsante Aggiungi: si fa tondo scorrendo giù */
+.fab{background:linear-gradient(180deg,color-mix(in srgb,var(--leaf) 88%,#fff),var(--leaf));box-shadow:0 8px 24px color-mix(in srgb,var(--leaf) 40%,transparent),inset 0 1px 0 rgba(255,255,255,.25);
+  transition:transform .5s var(--spring),padding .45s var(--ios),gap .45s var(--ios)}
+.fab span{display:inline-block;max-width:120px;overflow:hidden;white-space:nowrap;transition:max-width .45s var(--ios),opacity .25s}
+.fab.small{padding:0 18px;gap:0}
+.fab.small span{max-width:0;opacity:0}
+
+/* Messaggi: pillola di vetro in alto */
+.toast{background:var(--glass);color:var(--ink);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);
+  border-radius:99px;padding:11px 20px;box-shadow:0 10px 30px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.06);
+  transform:translate(-50%,-30px) scale(.9);transition:transform .5s var(--spring),opacity .3s ease;display:flex;align-items:center;justify-content:center;gap:10px;border-radius:22px;width:max-content}
+.toast.on{transform:translate(-50%,0) scale(1)}
+#t-undo{color:var(--water);font-weight:700;pointer-events:auto;padding:4px 2px}
+
+/* Impostazioni a gruppi, come nell'app Impostazioni */
+.group{background:var(--surface);border-radius:14px;margin-top:16px;overflow:hidden}
+.group .switch{background:none;border-radius:0;margin:0;position:relative}
+.group .switch+.switch::before{content:"";position:absolute;left:16px;right:0;top:0;border-top:.5px solid var(--line)}
+.group .switch.ora select{width:auto;height:34px;border:0;background:var(--surface-2);border-radius:9px;padding:0 12px;font:inherit;font-size:16px;color:var(--water);font-weight:600;appearance:none;-webkit-appearance:none}
+.switch input:checked{background:#34C759}
+.switch input{width:51px;height:31px;border-radius:16px}
+.switch input::after{width:27px;height:27px;left:2px;top:2px;box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16)}
+.switch input::after{transition:transform .35s var(--spring),width .25s var(--ios)}
+.switch input:active::after{width:33px}
+.switch input:checked::after{transform:translateX(20px)}
+.switch input:checked:active::after{transform:translateX(14px)}
+
+/* Campi e bottoni */
+.btn{border-radius:14px;height:52px}
+.btn.water{background:linear-gradient(180deg,color-mix(in srgb,var(--water) 85%,#fff),var(--water));box-shadow:0 6px 18px color-mix(in srgb,var(--water) 30%,transparent)}
+.btn.ghost{border:0;background:var(--surface)}
+.field input,.field select,.field textarea{border:0;background:var(--surface);border-radius:12px}
+.field input:focus,.field textarea:focus{outline:2px solid color-mix(in srgb,var(--water) 60%,transparent);outline-offset:0}
+.viewer{-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);background:rgba(0,0,0,.82)}
+
+@media (prefers-reduced-motion:reduce){
+  html.aperto .app{transform:none;border-radius:0}
+  .badge.due{animation:none}
+}
+.chip-f[aria-pressed="true"]:not([style]){background:var(--ink);color:var(--bg)}
+.switch[hidden]{display:none}
+.logo-mini{width:44px;height:44px;border-radius:11px;margin-bottom:6px;box-shadow:var(--shadow)}
