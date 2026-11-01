@@ -408,7 +408,7 @@ function formPianta(p) {
       if (!$("#guess-box")) return;
       if (ris.errore) { $("#guess-box").innerHTML = `<div class="note">${esc(ris.errore)}</div>`; return; }
       $("#guess-box").innerHTML = `<div class="guess">${ris.lista.map((g, i) => `<button data-g="${i}" style="animation-delay:${i * 80}ms"><span><b>${esc(g.nome)}</b><br><small class="latin">${esc(g.sci)}</small></span><span class="pct">${g.pct}%</span></button>`).join("")}</div>
-        <div class="note">Tocca quella giusta, oppure cerca qui sotto.</div>`;
+        <div class="note">${ris.lista[0].pct < 15 ? "Non ne sono sicuro: prova una foto più vicina alle foglie, oppure cerca qui sotto." : "Tocca quella giusta, oppure cerca qui sotto."}</div>`;
       const usa = i => { const g = ris.lista[i]; st.sci = g.sci; st.comune = g.sp === "altro" ? g.nome : ""; $$(".guess button").forEach(b => b.classList.toggle("sel", +b.dataset.g === i)); scegli(g.sp); };
       $$(".guess button").forEach(b => b.onclick = () => usa(+b.dataset.g));
       if (ris.lista[0].pct >= 40) usa(0);
