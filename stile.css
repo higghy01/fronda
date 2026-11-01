@@ -370,3 +370,23 @@ body.vuota .fab{display:none}
 .home-tip{position:relative;margin-top:16px;padding-right:44px;background:var(--water-soft)}
 .tip-x{position:absolute;right:8px;top:8px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:var(--ink-soft)}
 .tip-x svg{width:15px;height:15px}
+
+/* Versione 5: il dottore delle piante */
+.salute-btn{margin-top:12px;gap:10px}
+.salute-ico{font-size:19px;line-height:1}
+.salute-pick{aspect-ratio:16/9;margin-top:14px}
+.sintomi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.sintomo{display:flex;align-items:center;gap:8px;text-align:left;background:var(--surface);border-radius:14px;padding:11px 12px;font-size:14px;font-weight:500;line-height:1.25;min-height:52px;
+  box-shadow:var(--shadow);animation:rise .45s var(--ios) both;animation-delay:calc(var(--i)*25ms);transition:transform .45s var(--spring),background-color .25s,color .25s,box-shadow .25s}
+.sintomo span{font-size:19px;flex:none}
+.sintomo:active{transform:scale(.95);transition-duration:.1s}
+.sintomo[aria-pressed="true"]{background:var(--water-soft);box-shadow:0 0 0 2px var(--water) inset}
+.diag{margin-top:12px;background:var(--surface);border-radius:18px;padding:14px 16px;box-shadow:var(--shadow);animation:rise .5s var(--ios) both;animation-delay:calc(var(--i,0)*90ms)}
+.diag-h{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.diag-h b{font-family:var(--display);font-size:18px;letter-spacing:-.01em}
+.pill{font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--surface-2);color:var(--ink-soft);flex:none}
+.pill.alta{background:var(--warn-bg);color:#fff}
+.diag-p{margin:6px 0 0;color:var(--ink-soft);font-size:14.5px}
+.diag ol{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14.5px}
+.diag li::marker{color:var(--water);font-weight:700}
+#sal-vai:disabled{opacity:.45}

@@ -347,6 +347,7 @@ async function scheda(id, senzaAnim) {
       <div><b id="wb-t">${m < 0 ? `Ha sete da ${-m} ${m === -1 ? "giorno" : "giorni"}` : m === 0 ? "Ha sete: annaffiala oggi" : "Prossima acqua " + quando(m)}</b><span id="wb-s">Ultima volta ${fmtLungo(p.last)}${giorniDa(p.last) > 1 ? ", il " + fmt(p.last) : ""}</span></div></div>
     <button class="btn water" id="annaffia">${ICO.drop}Ho annaffiato</button>
     <div class="tip"><b>Il consiglio</b>${esc(s.tip)}</div>
+    <button class="btn ghost salute-btn" id="salute"><span class="salute-ico">🩺</span>Come sta? Controlla la salute</button>
     ${p.note ? `<div class="block-h">Note</div><div class="note-p">${esc(p.note)}</div>` : ""}
     <div class="block-h">Le sue foto <small id="nfoto"></small></div>
     <div class="album" id="album"><label class="add" for="foto-in">${ICO.cam}Aggiungi<br>foto</label></div>
@@ -357,6 +358,7 @@ async function scheda(id, senzaAnim) {
   `, "Scheda di " + p.nome);
   $("#sheet [data-close]").onclick = chiudiFoglio;
   $("#annaffia").onclick = e => animaAcqua(p, e);
+  $("#salute").onclick = () => salute(p);
   $("#modifica").onclick = () => formPianta(p);
   $("#foto-in").onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
@@ -602,6 +604,91 @@ async function riconosci(blob) {
   } catch (e) { return { errore: "Il riconoscimento non risponde: scegli il tipo dall'elenco." }; }
 }
 
+/* ---------- Il dottore: come sta la pianta ----------
+   Lei sceglie cosa vede (e se vuole fa una foto). Le scelte si incrociano con l'ultima annaffiatura;
+   la foto la guarda Pl@ntNet (parassiti e funghi). Tutto resta sul telefono, tranne la foto mandata a Pl@ntNet. */
+async function malattieDallaFoto(blob) {
+  if (!navigator.onLine) return { errore: "Senza rete non posso guardare la foto: uso solo quello che hai scelto." };
+  const fd = new FormData(); fd.append("images", blob, "pianta.jpg"); fd.append("organs", "auto");
+  try {
+    const ctl = new AbortController(); const tmo = setTimeout(() => ctl.abort(), 20000);
+    const res = await fetch(`https://my-api.plantnet.org/v2/diseases/identify?api-key=${encodeURIComponent(window.PLANTNET_KEY)}&lang=it&nb-results=10`, { method: "POST", body: fd, signal: ctl.signal });
+    clearTimeout(tmo);
+    if (res.status === 404) return { lista: [] };
+    if (res.status === 429) return { errore: "Per oggi i controlli dalla foto sono finiti: uso solo quello che hai scelto." };
+    if (!res.ok) return { errore: "Il controllo della foto non risponde: uso solo quello che hai scelto." };
+    const d = await res.json(), visti = new Set(), lista = [];
+    for (const r of d.results || []) {
+      if (r.score < .1) continue;
+      const testo = `${r.name || ""} ${r.description || ""}`;
+      const t = FOTO.find(([re]) => re.test(testo));
+      if (!t || visti.has(t[1])) continue;
+      visti.add(t[1]); lista.push({ k: t[1], pct: Math.round(r.score * 100) });
+    }
+    return { lista };
+  } catch (e) { return { errore: "Il controllo della foto non risponde: uso solo quello che hai scelto." }; }
+}
+function diagnosi(p, scelti, dallaFoto) {
+  const s = specie(p), r = giorniDa(p.last) / Math.max(1, ogni(p)), punti = new Map();
+  const aggiungi = (k, w, perche) => {
+    if (!w || !PROBLEMI[k]) return;
+    const x = punti.get(k) || { k, w: 0, perche: new Set() };
+    x.w += w; if (perche) x.perche.add(perche); punti.set(k, x);
+  };
+  scelti.forEach(id => { const sin = SINTOMI.find(x => x.id === id); if (sin) sin.c(r, s).forEach(([k, w, perche]) => aggiungi(k, w, perche)); });
+  (dallaFoto || []).forEach(f => aggiungi(f.k, f.pct >= 30 ? 4 : 2, `Lo vedo anche nella foto (${f.pct}%).`));
+  return [...punti.values()].sort((a, b) => b.w - a.w).slice(0, 3);
+}
+function salute(p) {
+  const conFoto = !!window.PLANTNET_KEY, scelti = new Set(); let foto = null;
+  apri(`
+    <h3 style="margin-top:4px">Come sta ${esc(p.nome)}?</h3>
+    <p class="note" style="margin-top:6px">Tocca quello che vedi. ${conFoto ? "Se vuoi, aggiungi una foto da vicino della parte che non va." : ""}</p>
+    ${conFoto ? `<label class="photo-pick salute-pick" for="sal-foto" id="sal-pick"><div>${ICO.cam}<b>Foto della parte malata</b><br><small>Facoltativa: cerca parassiti e funghi</small></div></label>
+    <input type="file" id="sal-foto" accept="image/*" hidden>` : ""}
+    <div class="block-h">Cosa vedi?</div>
+    <div class="sintomi">${SINTOMI.map((x, i) => `<button class="sintomo" data-s="${x.id}" aria-pressed="false" style="--i:${i}"><span>${x.e}</span>${esc(x.n)}</button>`).join("")}</div>
+    <button class="btn water" id="sal-vai" disabled>Vedi cosa può essere</button>
+    <div id="sal-esito" aria-live="polite"></div>
+    <button class="btn ghost" id="sal-torna" style="margin-top:18px">Torna alla scheda</button>
+  `, "Salute di " + p.nome);
+  const vai = $("#sal-vai");
+  const pronto = () => { vai.disabled = !scelti.size && !foto; };
+  $$("#sheet [data-s]").forEach(b => b.onclick = () => {
+    const id = b.dataset.s, on = !scelti.has(id);
+    on ? scelti.add(id) : scelti.delete(id); b.setAttribute("aria-pressed", on); tocco(); pronto();
+  });
+  if (conFoto) $("#sal-foto").onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { foto = await preparaFoto(f); $("#sal-pick").innerHTML = `<img src="${foto.thumb}" alt="">`; pronto(); }
+    catch (er) { toast("Questa foto non si riesce ad aprire. Prova con un'altra."); }
+  };
+  $("#sal-torna").onclick = () => scheda(p.id, true);
+  vai.onclick = async () => {
+    vai.disabled = true; tocco();
+    const box = $("#sal-esito");
+    let daFoto = null, avviso = "";
+    if (foto) {
+      vai.textContent = "Guardo la foto…";
+      $("#sal-pick").insertAdjacentHTML("beforeend", `<div class="scan"></div>`);
+      const ris = await malattieDallaFoto(foto.blob);
+      $("#sal-pick .scan")?.remove();
+      if (ris.errore) avviso = ris.errore; else { daFoto = ris.lista; if (!daFoto.length) avviso = "Nella foto non vedo parassiti o funghi che conosco."; }
+    }
+    if (!$("#sal-esito")) return;
+    const esito = diagnosi(p, [...scelti], daFoto);
+    vai.textContent = "Vedi cosa può essere"; pronto();
+    box.innerHTML = `${avviso ? `<p class="note" style="margin-top:14px">${esc(avviso)}</p>` : ""}
+      ${esito.length ? esito.map((x, i) => `<div class="diag" style="--i:${i}">
+        <div class="diag-h"><b>${esc(PROBLEMI[x.k].t)}</b><span class="pill ${x.w >= 3 ? "alta" : ""}">${x.w >= 3 ? "Probabile" : "Possibile"}</span></div>
+        ${[...x.perche].map(t => `<p class="diag-p">${esc(t)}</p>`).join("")}
+        <ol>${PROBLEMI[x.k].r.map(t => `<li>${esc(t)}</li>`).join("")}</ol>
+      </div>`).join("") : `<div class="diag"><div class="diag-h"><b>Non vedo problemi chiari</b></div><p class="diag-p">Se qualcosa ti preoccupa, scegli cosa vedi qui sopra oppure prova una foto più da vicino.</p></div>`}
+      <p class="note">Sono consigli generali: se la pianta peggiora, chiedi anche a un vivaio.</p>`;
+    requestAnimationFrame(() => box.scrollIntoView({ behavior: pocoMoto() ? "auto" : "smooth", block: "start" }));
+  };
+}
+
 /* ---------- Impostazioni e copia di sicurezza ---------- */
 function impostazioni() {
   const installata = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
@@ -623,7 +710,7 @@ function impostazioni() {
       <div id="b-conf"></div>
     </div>
     <button class="btn water" id="ok-set" style="margin-top:20px">Fatto</button>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 4.2 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 5 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `, "Impostazioni");
   $("#sw-stag").onchange = e => { imp.stagioni = e.target.checked; salvaImp(); render(); aggiornaPromemoria(); };
   $("#sw-prom").onchange = async e => {
