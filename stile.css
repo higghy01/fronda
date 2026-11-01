@@ -346,3 +346,24 @@ html.trascina .scrim{transition:none;opacity:var(--p)}
 .chip-f[aria-pressed="true"]:not([style]){background:var(--ink);color:var(--bg)}
 .switch[hidden]{display:none}
 .logo-mini{width:44px;height:44px;border-radius:11px;margin-bottom:6px;box-shadow:var(--shadow)}
+
+/* Revisione grafica v4 (01/11/2026) */
+:root{--warn:#D9541E;--warn-bg:var(--warn);--water-bg:#0A7AFF}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--warn-bg:#C94F1A;--water-bg:#0A7AFF}}
+:root[data-theme="dark"]{--warn-bg:#C94F1A;--water-bg:#0A7AFF}
+.btn.water{background:linear-gradient(180deg,color-mix(in srgb,var(--water-bg) 88%,#fff),var(--water-bg));box-shadow:0 6px 18px color-mix(in srgb,var(--water-bg) 30%,transparent)}
+.badge.soon{background:var(--water-bg)}
+/* bollini: niente sfocatura (pesante con tante piante), "respiro" fatto con un alone che cambia solo opacità e scala */
+.badge{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--surface)}
+.badge.due{background:var(--warn-bg);animation:none;isolation:isolate}
+.badge.due::after{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--warn-bg);z-index:-1;animation:alone 2.4s ease-in-out infinite;will-change:transform,opacity}
+@keyframes alone{0%,100%{transform:scale(1);opacity:.55}50%{transform:scale(1.35,1.6);opacity:0}}
+/* le piante disegnate ondeggiano solo quando la loro card è sullo schermo */
+.card .sway{animation-play-state:paused}
+.card.vis .sway{animation-play-state:running}
+.card .name{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.block-h{font-weight:700}
+body.vuota .fab{display:none}
+.ring.vuoto .bg{stroke:color-mix(in srgb,var(--warn) 30%,var(--surface-2))}
+.ring.vuoto text{fill:var(--warn);font-weight:700}
+@media (prefers-reduced-motion:reduce){.badge.due::after{animation:none;opacity:0}}

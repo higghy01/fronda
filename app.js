@@ -110,11 +110,12 @@ const ICO = {
 };
 const ring = (frac, label, big) => {
   const r = big ? 25 : 15, c = 2 * Math.PI * r, s = big ? 60 : 38, f = Math.max(0, Math.min(1, frac));
-  return `<svg class="ring" viewBox="0 0 ${s} ${s}" aria-hidden="true"><circle class="bg" cx="${s/2}" cy="${s/2}" r="${r}"/><circle class="fg" cx="${s/2}" cy="${s/2}" r="${r}" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - f)}" style="--c:${c}" transform="rotate(-90 ${s/2} ${s/2})"/><text x="${s/2}" y="${s/2}">${label}</text></svg>`;
+  return `<svg class="ring${f <= 0 ? " vuoto" : ""}" viewBox="0 0 ${s} ${s}" aria-hidden="true"><circle class="bg" cx="${s/2}" cy="${s/2}" r="${r}"/><circle class="fg" cx="${s/2}" cy="${s/2}" r="${r}" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - f)}" style="--c:${c}" transform="rotate(-90 ${s/2} ${s/2})"/><text x="${s/2}" y="${s/2}">${label}</text></svg>`;
 };
 const semeDi = p => { let h = 0; for (const ch of p.id) h = (h * 31 + ch.charCodeAt(0)) % 997; return h + 1; };
 // ogni stanza ha il suo colore (sempre lo stesso), così l'elenco non è tutto verde
-const TINTE = ["#E8833A", "#3A8DDE", "#B05CC8", "#D9A21B", "#E0577A", "#2BA59A", "#7A6FE0"];
+// tinte abbastanza scure da leggere bene il testo bianco sopra (contrasto 4:1 o più)
+const TINTE = ["#C25E1C", "#2A7FD4", "#9A50B8", "#9A7209", "#C2456A", "#1F8A80", "#6A5FD8"];
 // colori dati in ordine alfabetico delle stanze: due stanze vicine non hanno mai lo stesso colore
 const tintaStanza = s => { const i = stanze().indexOf(String(s || "").trim()); return TINTE[(i < 0 ? 0 : i) % TINTE.length]; };
 const pic = p => p.thumb ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : art(specie(p).art, specie(p).c, semeDi(p));
@@ -134,9 +135,11 @@ function render() {
       <button class="btn water" id="empty-add" style="max-width:280px">Aggiungi una pianta</button>
     </section>`;
     $("#empty-add").onclick = () => formPianta();
+    document.body.classList.add("vuota");
     return;
   }
 
+  document.body.classList.remove("vuota");
   const ordinate = [...piante].sort((a, b) => mancano(a) - mancano(b) || a.nome.localeCompare(b.nome, "it"));
   const oggi = ordinate.filter(p => mancano(p) <= 0);
   try { if (imp.promemoria && navigator.setAppBadge) oggi.length ? navigator.setAppBadge(oggi.length) : navigator.clearAppBadge(); } catch (e) {}
@@ -172,11 +175,16 @@ function render() {
 
   // scrivendo nella ricerca cambia solo l'elenco: il campo resta lo stesso (suggerimenti e correzione di iOS non si interrompono)
   const inp = $("#cerca");
-  if (inp) inp.oninput = e => { cerca = e.target.value; $("#grid").innerHTML = griglia(ordinate); };
+  if (inp) inp.oninput = e => { cerca = e.target.value; $("#grid").innerHTML = griglia(ordinate); osserva(); };
+  osserva();
   $$("[data-room]").forEach(b => b.onclick = () => { filtro = b.dataset.room; tocco(); morbido(render); });
   const all = $("#water-all");
   if (all) all.onclick = () => annaffiaTutte(oggi);
 }
+
+/* Le piante disegnate ondeggiano solo quando si vedono: con 50 piante il telefono resta fluido */
+const vista = "IntersectionObserver" in window ? new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle("vis", e.isIntersecting)), { rootMargin: "60px" }) : null;
+function osserva() { if (vista) vista.disconnect(); $$("#grid .card").forEach(c => vista ? vista.observe(c) : c.classList.add("vis")); }
 
 function griglia(ordinate) {
   const q = cerca.trim().toLowerCase();
@@ -255,6 +263,7 @@ function annaffiaTutte(lista) {
 let foglioAperto = false, viewerAperto = false, schedaAperta = null;
 function apri(html, label) {
   const sh = $("#sheet");
+  $("#toast").classList.remove("on"); clearTimeout(tt);
   sh.innerHTML = `<div class="grab"></div>` + html;
   sh.setAttribute("aria-label", label || "");
   sh.scrollTop = 0;
@@ -314,7 +323,7 @@ async function scheda(id, senzaAnim) {
   const s = specie(p), m = mancano(p);
   apri(`
     <div class="hero" id="hero">${pic(p)}<button class="close" data-close aria-label="Chiudi">${ICO.x}</button></div>
-    <h3>${esc(p.nome)}</h3><div class="latin">${p.sp === "altro" ? esc(p.sci || s.n) : esc(s.n) + " · " + esc(p.sci || s.l)}</div>
+    <h3>${esc(p.nome)}</h3><div class="latin">${p.sp === "altro" ? esc(p.sci || s.n) : (p.sci || s.l) === s.n ? esc(s.n) : esc(s.n) + " · " + esc(p.sci || s.l)}</div>
     <div class="chips">
       <span class="chip">${ICO.drop}Ogni ${ogni(p)} ${ogni(p) === 1 ? "giorno" : "giorni"}${stagioneInv() ? " (inverno)" : ""}</span>
       <span class="chip">${ICO.sun}${esc(s.luce)}</span>
@@ -601,7 +610,7 @@ function impostazioni() {
       <div id="b-conf"></div>
     </div>
     <button class="btn water" id="ok-set" style="margin-top:20px">Fatto</button>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 4 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 4.1 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `, "Impostazioni");
   $("#sw-stag").onchange = e => { imp.stagioni = e.target.checked; salvaImp(); render(); aggiornaPromemoria(); };
   $("#sw-prom").onchange = async e => {
