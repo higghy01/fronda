@@ -1,7 +1,7 @@
 /* Copia dell'app sul telefono: si apre anche senza rete.
    A ogni modifica dei file alzare VERSIONE, altrimenti il telefono resta sulla vecchia. */
-const VERSIONE = "fronda-v4";
-const FILE = ["./", "index.html", "stile.css?v=4", "config.js?v=4", "cure.js?v=4", "disegni.js?v=4", "app.js?v=4", "manifest.json", "icona-180.png", "icona-512.png"];
+const VERSIONE = "fronda-v5";
+const FILE = ["./", "index.html", "stile.css?v=5", "config.js?v=5", "cure.js?v=5", "disegni.js?v=5", "app.js?v=5", "manifest.json", "icona-180.png", "icona-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSIONE).then(c => c.addAll(FILE)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n !== VERSIONE).map(n => caches.delete(n)))).then(() => self.clients.claim()));
@@ -17,4 +17,20 @@ self.addEventListener("fetch", e => {
     // caratteri: prima la copia
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(n => { const c = n.clone(); caches.open(VERSIONE).then(x => x.put(e.request, c)); return n; })));
   }
+});
+
+/* Promemoria del mattino */
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || "Fronda", {
+    body: d.body || "Qualche pianta ha sete oggi", tag: d.tag || "fronda", icon: "icona-180.png", badge: "icona-180.png"
+  }));
+});
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(l => {
+    for (const c of l) if ("focus" in c) return c.focus();
+    return self.clients.openWindow("./");
+  }));
 });
