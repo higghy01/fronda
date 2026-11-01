@@ -1,0 +1,15 @@
+{
+  "name": "Fronda",
+  "short_name": "Fronda",
+  "description": "Le tue piante di casa: quando annaffiarle, consigli e foto.",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EDF1EA",
+  "theme_color": "#EDF1EA",
+  "icons": [
+    { "src": "icona-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
