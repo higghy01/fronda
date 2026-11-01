@@ -1,3 +1,3 @@
 /* Chiave del servizio gratuito Pl@ntNet per riconoscere le piante dalla foto.
-   Vuota = riconoscimento spento (si sceglie il tipo dall'elenco). */
-window.PLANTNET_KEY = "";
+   Funziona solo dal sito di Fronda (domini autorizzati nell account Pl@ntNet). Vuota = riconoscimento spento. */
+window.PLANTNET_KEY = "2b10wMl701q255qBptgek9kfO";
