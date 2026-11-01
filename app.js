@@ -137,7 +137,7 @@ const vuoto = () => `<section class="empty">
       <p>Fai una foto, scegli il tipo e Rigo ti dice quando annaffiarla.</p>
       <button class="btn water" data-add style="max-width:280px">Aggiungi una pianta</button>
     </section>`;
-let sete = -1;   // quante avevano sete al giro prima: se si passa a zero, si fa festa
+let sete = -1, daFesteggiare = false;   // la festa parte solo se si arriva a zero annaffiando (non eliminando, modificando o ripristinando)
 
 function render() {
   const vo = $("#v-oggi"), vp = $("#v-piante");
@@ -206,7 +206,8 @@ function render() {
   const all = $("#water-all");
   if (all) all.onclick = () => annaffiaTutte(oggi);
   contatore(oggi.length);
-  if (sete > 0 && oggi.length === 0) festa();
+  if (daFesteggiare && sete > 0 && oggi.length === 0) festa();
+  daFesteggiare = false;
   sete = oggi.length;
 }
 
@@ -234,12 +235,12 @@ function festa() {
   setTimeout(() => box.remove(), 3400);
 }
 
-/* Cambio scheda con una scivolata (verso destra o sinistra a seconda dell'ordine) */
+/* Cambio scheda in dissolvenza */
 const SCHEDE = ["oggi", "piante", "imp"];
 let tabAttiva = "oggi";
 function vai(tab) {
   if (tab === tabAttiva) { const v = $("#v-" + tab); v.scrollTo({ top: 0, behavior: pocoMoto() ? "auto" : "smooth" }); return; }
-  const da = $("#v-" + tabAttiva), a = $("#v-" + tab), dir = SCHEDE.indexOf(tab) > SCHEDE.indexOf(tabAttiva) ? 1 : -1;
+  const da = $("#v-" + tabAttiva), a = $("#v-" + tab);
   tabAttiva = tab;
   if (tab === "imp") impostazioni();
   $$(".tab").forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
@@ -247,8 +248,9 @@ function vai(tab) {
   da.classList.remove("on"); a.classList.add("on");
   barraTitolo();
   if (!pocoMoto() && a.animate) {
-    a.animate([{ opacity: 0, transform: `translateX(${dir * 28}px)` }, { opacity: 1, transform: "none" }], { duration: 380, easing: MOLLA });
-    da.animate([{ opacity: 1, visibility: "visible", transform: "none" }, { opacity: 0, visibility: "visible", transform: `translateX(${-dir * 28}px)` }], { duration: 220, easing: "ease-out" });
+    // solo dissolvenza (con una scala leggerissima): le scivolate di lato a Sasha danno fastidio
+    a.animate([{ opacity: 0, transform: "scale(.985)" }, { opacity: 1, transform: "none" }], { duration: 320, easing: MOLLA });
+    da.animate([{ opacity: 1, visibility: "visible" }, { opacity: 0, visibility: "visible" }], { duration: 180, easing: "ease-out" });
   }
   const ic = $(`.tab[data-tab="${tab}"] svg`);
   if (ic && ic.animate && !pocoMoto()) ic.animate([{ transform: "scale(1)" }, { transform: "scale(.78) translateY(2px)" }, { transform: "scale(1.15) translateY(-3px)" }, { transform: "scale(1)" }], { duration: 520, easing: "ease-out" });
@@ -337,6 +339,7 @@ function annaffia(p, dalla) {
   p.last = now();
   p.storia = [p.last, ...p.storia].slice(0, 60);
   salva(p);
+  daFesteggiare = true;
   morbido(render);
   toast(`${p.nome} ringrazia`, () => { Object.assign(p, prima); salva(p); morbido(render); if (schedaAperta === p.id) scheda(p.id, true); });
 }
@@ -346,6 +349,7 @@ function annaffiaTutte(lista) {
   $$(".trow").forEach((r, i) => setTimeout(() => r.classList.add("gone"), i * 50));
   setTimeout(() => {
     lista.forEach(p => { p.last = now(); p.storia = [p.last, ...p.storia].slice(0, 60); salva(p); });
+    daFesteggiare = true;
     morbido(render);
     toast(`${lista.length} piante annaffiate`, () => { prima.forEach(x => { x.p.last = x.last; x.p.storia = x.storia; salva(x.p); }); morbido(render); });
   }, 280 + lista.length * 50);
@@ -413,7 +417,7 @@ async function scheda(id, senzaAnim) {
   schedaAperta = id;
   const s = specie(p), m = mancano(p);
   apri(`
-    <div class="hero" id="hero">${pic(p)}<button class="close" data-close aria-label="Chiudi">${ICO.x}</button></div>
+    <div class="hero" id="hero">${pic(p).replace("xMidYMid slice", "xMidYMax slice")}<button class="close" data-close aria-label="Chiudi">${ICO.x}</button></div>
     <h3>${esc(p.nome)}</h3><div class="latin">${p.sp === "altro" ? esc(p.sci || s.n) : (p.sci || s.l) === s.n ? esc(s.n) : esc(s.n) + " · " + esc(p.sci || s.l)}</div>
     <div class="chips">
       <span class="chip">${ICO.drop}Ogni ${ogni(p)} ${ogni(p) === 1 ? "giorno" : "giorni"}${stagioneInv() ? " (inverno)" : ""}</span>
@@ -790,7 +794,7 @@ function impostazioni() {
       <input type="file" id="b-file" accept="application/json,.json" hidden>
       <div id="b-conf"></div>
     </div>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.1 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `);
   $("#sw-stag").onchange = e => { imp.stagioni = e.target.checked; salvaImp(); render(); aggiornaPromemoria(); };
   $("#sw-prom").onchange = async e => {
@@ -977,6 +981,12 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && pi
 // "+" in alto e nello stato vuoto, barra delle schede, barra piccola che compare scorrendo
 $("#app").addEventListener("click", e => { if (e.target.closest("[data-add]")) { tocco(); formPianta(); } });
 $$(".tab").forEach(b => b.onclick = () => vai(b.dataset.tab));
+/* Tastiera dell'iPhone: il campo scelto resta visibile, e quando la tastiera si chiude la pagina torna al suo posto */
+document.addEventListener("focusin", e => {
+  const c = e.target.closest("input,textarea,select"); if (!c || c.type === "file" || c.type === "checkbox") return;
+  setTimeout(() => c.scrollIntoView({ block: "center", behavior: pocoMoto() ? "auto" : "smooth" }), 320);
+});
+document.addEventListener("focusout", () => setTimeout(() => { if (!document.activeElement || !document.activeElement.matches("input,textarea,select")) window.scrollTo(0, 0); }, 80));
 $$(".vista").forEach(v => {
   let attesa = false;
   v.addEventListener("scroll", () => {
