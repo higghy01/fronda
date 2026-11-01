@@ -37,8 +37,40 @@ const DB = {
   put: (s, v) => DB.tx(s, "readwrite", st => st.put(v)),
   del: (s, k) => DB.tx(s, "readwrite", st => st.delete(k)),
   clear: s => DB.tx(s, "readwrite", st => st.clear()),
-  fotoDi: pid => DB.tx("foto", "readonly", st => st.index("pianta").getAll(pid))
+  fotoDi: pid => DB.tx("foto", "readonly", st => st.index("pianta").getAll(pid)),
+  // pianta nuova e sua foto insieme: niente foto rimaste senza pianta se lo spazio finisce
+  salvaNuova(p, foto) { return DB.insieme(false, [p], foto ? [foto] : []); },
+  // svuota e riscrive piante e foto nella stessa operazione: o va tutto, o non cambia niente
+  sostituisci(piante, foto) { return DB.insieme(true, piante, foto); },
+  insieme(svuota, piante, foto) {
+    return new Promise((ok, ko) => {
+      const t = this.db.transaction(["piante", "foto"], "readwrite");
+      const sp = t.objectStore("piante"), sf = t.objectStore("foto");
+      try {
+        if (svuota) { sp.clear(); sf.clear(); }
+        piante.forEach(p => sp.put(p)); foto.forEach(f => sf.put(f));
+      } catch (e) { t.abort(); ko(e); return; }
+      t.oncomplete = () => ok();
+      t.onerror = () => ko(t.error);
+      t.onabort = () => ko(t.error);
+    });
+  }
 };
+
+/* Una pianta letta da un file di copia: tiene solo i campi giusti, del tipo giusto */
+const giorni = (v, base) => { const n = Math.round(+v); return n >= 1 && n <= 90 ? n : base; };
+function pulisciPianta(p) {
+  if (!p || typeof p.id !== "string" || !/^[a-z0-9]{4,40}$/i.test(p.id)) return null;
+  const sp = SPECIE[p.sp] ? p.sp : "altro", s = SPECIE[sp];
+  return {
+    id: p.id, nome: String(p.nome || s.n).slice(0, 40), sp, sci: String(p.sci || "").slice(0, 80),
+    stanza: String(p.stanza || "").slice(0, 30), e: giorni(p.e, s.e), i: giorni(p.i, s.i), note: String(p.note || "").slice(0, 400),
+    creata: +p.creata || now(), last: +p.last || now(),
+    storia: Array.isArray(p.storia) ? p.storia.map(Number).filter(Boolean).slice(0, 60) : [],
+    thumb: typeof p.thumb === "string" && p.thumb.startsWith("data:image/") ? p.thumb : null,
+    coverId: p.coverId ? String(p.coverId) : null
+  };
+}
 
 const IMP_KEY = "fronda-impostazioni";
 let imp = { stagioni: true, promemoria: false, ora: "09:00" };
@@ -81,7 +113,7 @@ const ring = (frac, label, big) => {
   return `<svg class="ring" viewBox="0 0 ${s} ${s}" aria-hidden="true"><circle class="bg" cx="${s/2}" cy="${s/2}" r="${r}"/><circle class="fg" cx="${s/2}" cy="${s/2}" r="${r}" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - f)}" transform="rotate(-90 ${s/2} ${s/2})"/><text x="${s/2}" y="${s/2}">${label}</text></svg>`;
 };
 const semeDi = p => { let h = 0; for (const ch of p.id) h = (h * 31 + ch.charCodeAt(0)) % 997; return h + 1; };
-const pic = p => p.thumb ? `<img src="${p.thumb}" alt="" loading="lazy">` : art(specie(p).art, specie(p).c, semeDi(p));
+const pic = p => p.thumb ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : art(specie(p).art, specie(p).c, semeDi(p));
 
 /* ---------- Schermata principale ---------- */
 function render() {
@@ -109,10 +141,6 @@ function render() {
   const elencoStanze = stanze();
   if (filtro && !elencoStanze.includes(filtro)) filtro = "";
 
-  const q = cerca.trim().toLowerCase();
-  const visibili = ordinate.filter(p => (!filtro || (p.stanza || "").trim() === filtro) &&
-    (!q || p.nome.toLowerCase().includes(q) || specie(p).n.toLowerCase().includes(q) || (p.stanza || "").toLowerCase().includes(q)));
-
   main.innerHTML = `
   <section class="today">
     ${ring(1 - oggi.length / tot, `${tot - oggi.length}/${tot}`, true).replace('class="ring"', 'class="ring gauge"')}
@@ -123,10 +151,10 @@ function render() {
 
   ${oggi.length ? `<div class="section-h"><h2>Da annaffiare</h2><small>${oggi.length}</small></div>
   <div class="thirsty" id="thirsty">
-    ${oggi.map((p, i) => `<div class="trow" style="--i:${i}" data-id="${p.id}">
-      <button class="mini" data-open="${p.id}" aria-label="Apri ${esc(p.nome)}">${pic(p)}</button>
-      <button class="t" data-open="${p.id}" style="text-align:left"><b>${esc(p.nome)}</b><small>${mancano(p) < 0 ? `in ritardo di ${-mancano(p)} ${mancano(p) === -1 ? "giorno" : "giorni"}` : "oggi"}${p.stanza ? " · " + esc(p.stanza) : ""}</small></button>
-      <button class="wbtn" data-water="${p.id}">${ICO.drop}Fatto</button>
+    ${oggi.map((p, i) => `<div class="trow" style="--i:${i}" data-id="${esc(p.id)}">
+      <button class="mini" data-open="${esc(p.id)}" aria-label="Apri ${esc(p.nome)}">${pic(p)}</button>
+      <button class="t" data-open="${esc(p.id)}" style="text-align:left"><b>${esc(p.nome)}</b><small>${mancano(p) < 0 ? `in ritardo di ${-mancano(p)} ${mancano(p) === -1 ? "giorno" : "giorni"}` : "oggi"}${p.stanza ? " · " + esc(p.stanza) : ""}</small></button>
+      <button class="wbtn" data-water="${esc(p.id)}">${ICO.drop}Fatto</button>
     </div>`).join("")}
     ${oggi.length > 1 ? `<button class="allbtn" id="water-all">Le ho annaffiate tutte</button>` : ""}
   </div>` : ""}
@@ -136,24 +164,30 @@ function render() {
     ${tot > 6 ? `<div class="search">${ICO.search}<input id="cerca" type="search" placeholder="Cerca per nome, tipo o stanza" value="${esc(cerca)}" autocomplete="off" enterkeyhint="search"></div>` : ""}
     ${elencoStanze.length > 1 ? `<div class="rooms">${["", ...elencoStanze].map(s => `<button class="chip-f" data-room="${esc(s)}" aria-pressed="${s === filtro}">${s ? esc(s) : "Tutte"}</button>`).join("")}</div>` : ""}
   </div>` : ""}
-  <div class="grid" id="grid">
-    ${visibili.map((p, i) => { const m = mancano(p);
-      return `<button class="card" style="--i:${Math.min(i, 12)}" data-open="${p.id}">
-        <div class="pic">${pic(p)}${m <= 1 ? `<span class="badge ${m <= 0 ? "due" : "soon"}">${m <= 0 ? "Ha sete" : "Domani"}</span>` : ""}</div>
-        <div class="meta"><div class="txt"><div class="name">${esc(p.nome)}</div><div class="kind">${esc(p.stanza || specie(p).n)}</div></div>${ring(Math.max(0, m) / ogni(p), m <= 0 ? "0g" : m + "g")}</div>
-      </button>`; }).join("") || `<div class="nores">Nessuna pianta trovata</div>`}
-  </div>`;
+  <div class="grid" id="grid">${griglia(ordinate)}</div>`;
 
+  // scrivendo nella ricerca cambia solo l'elenco: il campo resta lo stesso (suggerimenti e correzione di iOS non si interrompono)
   const inp = $("#cerca");
-  if (inp) inp.oninput = e => { cerca = e.target.value; const pos = e.target.selectionStart; render(); const n = $("#cerca"); n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) {} };
+  if (inp) inp.oninput = e => { cerca = e.target.value; $("#grid").innerHTML = griglia(ordinate); };
   $$("[data-room]").forEach(b => b.onclick = () => { filtro = b.dataset.room; render(); });
   const all = $("#water-all");
   if (all) all.onclick = () => annaffiaTutte(oggi);
 }
 
+function griglia(ordinate) {
+  const q = cerca.trim().toLowerCase();
+  const visibili = ordinate.filter(p => (!filtro || (p.stanza || "").trim() === filtro) &&
+    (!q || p.nome.toLowerCase().includes(q) || specie(p).n.toLowerCase().includes(q) || (p.stanza || "").toLowerCase().includes(q)));
+  return visibili.map((p, i) => { const m = mancano(p);
+    return `<button class="card" style="--i:${Math.min(i, 12)}" data-open="${esc(p.id)}">
+      <div class="pic">${pic(p)}${m <= 1 ? `<span class="badge ${m <= 0 ? "due" : "soon"}">${m <= 0 ? "Ha sete" : "Domani"}</span>` : ""}</div>
+      <div class="meta"><div class="txt"><div class="name">${esc(p.nome)}</div><div class="kind">${esc(p.stanza || specie(p).n)}</div></div>${ring(Math.max(0, m) / ogni(p), m <= 0 ? "0g" : m + "g")}</div>
+    </button>`; }).join("") || `<div class="nores">Nessuna pianta trovata</div>`;
+}
+
 $("#main").addEventListener("click", e => {
   const w = e.target.closest("[data-water]");
-  if (w) { const p = piante.find(x => x.id === w.dataset.water); const row = w.closest(".trow"); row.classList.add("gone"); setTimeout(() => annaffia(p), 280); return; }
+  if (w) { const p = piante.find(x => x.id === w.dataset.water); const row = w.closest(".trow"); if (!p || row.classList.contains("gone")) return; row.classList.add("gone"); setTimeout(() => annaffia(p), 280); return; }
   const o = e.target.closest("[data-open]");
   if (o) scheda(o.dataset.open);
 });
@@ -191,7 +225,7 @@ function apri(html, label) {
 }
 function chiudiFoglio() { if (foglioAperto) history.back(); }
 function _chiudiFoglio() {
-  foglioAperto = false; schedaAperta = null;
+  foglioAperto = false; schedaAperta = null; liberaFoto();
   $("#sheet").classList.remove("on");
   $("#scrim").classList.remove("on");
 }
@@ -265,6 +299,8 @@ async function scheda(id, senzaAnim) {
 
 const urlFoto = new Map();
 const urlDi = f => { if (!urlFoto.has(f.id)) urlFoto.set(f.id, URL.createObjectURL(f.blob)); return urlFoto.get(f.id); };
+// le foto grandi servono solo nella scheda: quando si chiude si liberano (dopo l'animazione di chiusura)
+const liberaFoto = () => { const vecchi = [...urlFoto.values()]; urlFoto.clear(); setTimeout(() => vecchi.forEach(u => URL.revokeObjectURL(u)), 600); };
 async function caricaAlbum(p) {
   const foto = (await DB.fotoDi(p.id)).sort((a, b) => b.t - a.t);
   if (schedaAperta !== p.id) return;
@@ -272,7 +308,7 @@ async function caricaAlbum(p) {
   const cover = foto.find(f => f.id === p.coverId);
   if (cover) { const h = $("#hero img"); if (h) h.src = urlDi(cover); }
   $("#album").insertAdjacentHTML("afterbegin", foto.map((f, i) =>
-    `<button class="ph${f.id === p.coverId ? " is-cover" : ""}" data-foto="${f.id}" style="animation-delay:${i * 40}ms"><img src="${urlDi(f)}" alt="Foto del ${fmt(f.t)}"><i>${fmt(f.t)}</i></button>`).join(""));
+    `<button class="ph${f.id === p.coverId ? " is-cover" : ""}" data-foto="${esc(f.id)}" style="animation-delay:${i * 40}ms"><img src="${urlDi(f)}" alt="Foto del ${fmt(f.t)}"><i>${fmt(f.t)}</i></button>`).join(""));
   $$("#album [data-foto]").forEach(b => b.onclick = () => apriFoto(p, foto.find(f => f.id === b.dataset.foto)));
 }
 
@@ -289,6 +325,7 @@ function apriFoto(p, f) {
     const b = e.currentTarget;
     if (b.dataset.sure) {
       DB.del("foto", f.id).then(async () => {
+        if (urlFoto.has(f.id)) { URL.revokeObjectURL(urlFoto.get(f.id)); urlFoto.delete(f.id); }
         if (p.coverId === f.id) { const resto = (await DB.fotoDi(p.id)).sort((a, b) => b.t - a.t); p.coverId = resto[0]?.id || null; p.thumb = resto[0] ? await miniatura(resto[0].blob) : null; await salva(p); render(); }
         history.back(); setTimeout(() => scheda(p.id, true), 50); toast("Foto eliminata");
       });
@@ -428,8 +465,13 @@ function formPianta(p) {
     };
   }
 
-  $("#f-salva").onclick = async () => {
+  $("#f-salva").onclick = async e => {
     if (!st.sp) { toast("Scegli il tipo di pianta (o \"Altra pianta\")"); $("#sp-cerca").focus(); return; }
+    const b = e.currentTarget; if (b.disabled) return; b.disabled = true;
+    try { await salvaForm(); } catch (er) { toast("Non riesco a salvare: lo spazio del telefono è pieno?"); }
+    b.disabled = false;
+  };
+  async function salvaForm() {
     const nome = $("#f-nome").value.trim() || (st.sp === "altro" && st.comune) || SPECIE[st.sp].n;
     const stanza = $("#f-stanza").value.trim();
     const note = $("#f-note").value.trim();
@@ -438,17 +480,17 @@ function formPianta(p) {
       const np = { id: nuovoId(), nome, sp: st.sp, sci: st.sci || "", stanza, e: st.e, i: st.i, note, creata: now(), storia: [], thumb: null, coverId: null };
       np.last = q >= 0 ? inizioGiorno(now()) - q * DAY + 12 * 36e5 : now() - (stagioneInv() ? st.i : st.e) * DAY;
       if (q >= 0) np.storia = [np.last];
-      if (st.foto) {
-        const ft = { id: nuovoId(), pianta: np.id, t: now(), blob: st.foto.blob };
-        await DB.put("foto", ft); np.coverId = ft.id; np.thumb = st.foto.thumb;
-      }
-      await salva(np); piante.push(np);
+      let ft = null;
+      if (st.foto) { ft = { id: nuovoId(), pianta: np.id, t: now(), blob: st.foto.blob }; np.coverId = ft.id; np.thumb = st.foto.thumb; }
+      await DB.salvaNuova(np, ft); piante.push(np); aggiornaPromemoria();
       chiudiFoglio(); render(); toast("Benvenuta in casa!");
     } else {
-      Object.assign(p, { nome, sp: st.sp, stanza, e: st.e, i: st.i, note });
-      await salva(p); render(); scheda(p.id, true); toast("Salvato");
+      // il nome latino del riconoscimento vale solo per il tipo per cui è stato trovato
+      const nuovi = { nome, sp: st.sp, sci: st.sp === p.sp ? p.sci : (st.sci || ""), stanza, e: st.e, i: st.i, note };
+      await DB.put("piante", Object.assign({}, p, nuovi)); Object.assign(p, nuovi); aggiornaPromemoria();
+      render(); scheda(p.id, true); toast("Salvato");
     }
-  };
+  }
 }
 
 /* ---------- Riconoscimento dalla foto (Pl@ntNet, gratuito) ---------- */
@@ -550,13 +592,26 @@ function chiediRipristino(file) {
     $("#b-conf").innerHTML = `<div class="confirm"><p>La copia ha <b>${d.piante.length} piante</b> e ${d.foto?.length || 0} foto. Sostituisce tutto quello che c'è adesso sul telefono.</p>
       <div class="row2"><button class="btn ghost" id="r-no">Annulla</button><button class="btn warn" id="r-si">Ripristina</button></div></div>`;
     $("#r-no").onclick = () => $("#b-conf").innerHTML = "";
-    $("#r-si").onclick = async () => {
-      await DB.clear("piante"); await DB.clear("foto");
-      for (const p of d.piante) await DB.put("piante", p);
-      for (const f of d.foto || []) { const blob = await (await fetch(f.data)).blob(); await DB.put("foto", { id: f.id, pianta: f.pianta, t: f.t, blob }); }
-      if (d.impostazioni) { imp = Object.assign({ stagioni: true }, d.impostazioni); salvaImp(); }
-      piante = await DB.all("piante"); urlFoto.clear(); aggiornaPromemoria();
-      chiudiFoglio(); render(); toast("Copia ripristinata");
+    $("#r-si").onclick = async e => {
+      const b = e.currentTarget; b.disabled = true; b.textContent = "Ripristino…";
+      try {
+        // prima si prepara tutto, poi si sostituisce in un colpo solo: se qualcosa va storto resta tutto com'era
+        const nuove = d.piante.map(pulisciPianta).filter(Boolean);
+        const ids = new Set(nuove.map(p => p.id));
+        const foto = [];
+        for (const f of d.foto || []) {
+          if (!f || typeof f.data !== "string" || !f.data.startsWith("data:image/") || !ids.has(f.pianta)) continue;
+          foto.push({ id: String(f.id), pianta: f.pianta, t: +f.t || now(), blob: await (await fetch(f.data)).blob() });
+        }
+        await DB.sostituisci(nuove, foto);
+        // il promemoria resta quello di questo telefono: l'iscrizione agli avvisi non viaggia con la copia
+        if (d.impostazioni) { imp = Object.assign({}, imp, { stagioni: d.impostazioni.stagioni !== false, ora: d.impostazioni.ora || imp.ora }); salvaImp(); }
+        piante = await DB.all("piante"); liberaFoto(); aggiornaPromemoria();
+        chiudiFoglio(); render(); toast("Copia ripristinata");
+      } catch (er) {
+        b.disabled = false; b.textContent = "Ripristina";
+        toast("Ripristino non riuscito: le piante di prima sono ancora tutte qui");
+      }
     };
   };
   r.readAsText(file);
