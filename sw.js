@@ -1,7 +1,7 @@
 /* Copia dell'app sul telefono: si apre anche senza rete.
    A ogni modifica dei file alzare VERSIONE, altrimenti il telefono resta sulla vecchia. */
-const VERSIONE = "fronda-v5";
-const FILE = ["./", "index.html", "stile.css?v=5", "config.js?v=5", "cure.js?v=5", "disegni.js?v=5", "app.js?v=5", "manifest.json", "icona-180.png", "icona-512.png"];
+const VERSIONE = "fronda-v6";
+const FILE = ["./", "index.html", "stile.css?v=6", "config.js?v=6", "cure.js?v=6", "disegni.js?v=6", "app.js?v=6", "manifest.json", "icona-180.png", "icona-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSIONE).then(c => c.addAll(FILE)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n !== VERSIONE).map(n => caches.delete(n)))).then(() => self.clients.claim()));
