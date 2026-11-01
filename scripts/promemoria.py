@@ -86,7 +86,7 @@ def main():
             continue
         sete = da_annaffiare(t, ora.date())
         if sete:
-            corpo = {"title": "Fronda", "body": testo(sete), "tag": f"acqua-{oggi}"}
+            corpo = {"title": "Rigo", "body": testo(sete), "tag": f"acqua-{oggi}"}
             try:
                 webpush(sub, json.dumps(corpo), vapid_private_key=vapid,
                         vapid_claims={"sub": "https://higghy01.github.io"}, ttl=6 * 3600, timeout=10)
