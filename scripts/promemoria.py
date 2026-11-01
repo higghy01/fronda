@@ -89,7 +89,7 @@ def main():
             corpo = {"title": "Fronda", "body": testo(sete), "tag": f"acqua-{oggi}"}
             try:
                 webpush(sub, json.dumps(corpo), vapid_private_key=vapid,
-                        vapid_claims={"sub": "https://higghy01.github.io/fronda/"}, ttl=6 * 3600, timeout=10)
+                        vapid_claims={"sub": "https://higghy01.github.io"}, ttl=6 * 3600, timeout=10)
                 mandati += 1
             except WebPushException as e:
                 stato = getattr(e.response, "status_code", None)
@@ -100,7 +100,7 @@ def main():
                 print(f"Invio non riuscito ({stato}).")
                 continue
             except Exception as e:  # rete lenta o servizio giù: si riprova al giro dopo
-                print(f"Invio non riuscito ({type(e).__name__}).")
+                print(f"Invio non riuscito ({type(e).__name__}: {str(e)[:120]}).")
                 continue
         doc.reference.update({"inviato": oggi})
     print(f"Promemoria mandati: {mandati}.")
