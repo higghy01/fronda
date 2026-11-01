@@ -48,19 +48,19 @@ window.SINTOMI = [
 
 /* Risultati di Pl@ntNet (nomi scientifici) → il nostro problema */
 window.FOTO = [
-  [/Pseudococc|Planococc|Coccus|Coccidae|Diaspid|Saissetia|scale|mealybug|cocciniglia/i, "cocciniglia"],
-  [/Tetranych|Oligonych|Acari|Tarsonem|mite|ragnetto|acaro/i, "ragnetto"],
-  [/Aphid|aphis|Myzus|afide/i, "afidi"],
-  [/Thrip|Thysanopt|tripide/i, "tripidi"],
-  [/Aleyrod|Trialeurod|Bemisia|whitefly|aleirode/i, "moscaBianca"],
-  [/Bradysia|Sciar|fungus gnat/i, "moscerini"],
+  [/Pseudococc|Planococc|Coccus|Coccidae|Diaspid|Saissetia|scale|mealybug|coccinigli/i, "cocciniglia"],
+  [/Tetranych|Oligonych|Acari|Tarsonem|mite|ragnet|acar/i, "ragnetto"],
+  [/Aphid|aphis|Myzus|afid/i, "afidi"],
+  [/Thrip|Thysanopt|tripid/i, "tripidi"],
+  [/Aleyrod|Trialeurod|Bemisia|whitefly|aleirod|mosca bianca|mosche bianche/i, "moscaBianca"],
+  [/Bradysia|Sciar|fungus gnat|moscerin/i, "moscerini"],
   [/Erysiph|Oidium|Podosph|Golovinomyces|powdery mildew|oidio/i, "oidio"],
   [/Botrytis|grey mould|grey mildew|muffa grigia/i, "muffa"],
   [/Pythium|Phytophthora|Rhizoctonia|Fusarium|root rot|collar rot|marciume/i, "marciume"],
   [/Puccini|Uromyces|Melampsora|rust|ruggine/i, "ruggine"],
-  [/Xanthomonas|Pseudomonas|Erwinia|Pectobacterium|Dickeya|bacterial|batteric/i, "batteri"],
+  [/Xanthomonas|Pseudomonas|Erwinia|Pectobacterium|Dickeya|bacterial|batteri/i, "batteri"],
   [/virus|viroid/i, "virus"],
-  [/Gastropoda|Helix|Arion|Deroceras|slug|snail|lumac/i, "lumache"],
-  [/Otiorhynch|weevil|oziorrinco/i, "oziorrinco"],
-  [/Colletotrichum|Alternaria|Cercospora|Septoria|Phyllosticta|Ascochyta|Cylindrocladium|Myrothecium|leaf spot|anthracnose|antracnosi|blight/i, "macchieFungo"]
+  [/Gastropoda|Helix|Arion|Deroceras|slug|snail|lumac|limacc/i, "lumache"],
+  [/Otiorhynch|weevil|oziorrinc/i, "oziorrinco"],
+  [/Colletotrichum|Alternaria|Cercospora|Septoria|Phyllosticta|Ascochyta|Cylindrocladium|Myrothecium|leaf spot|anthracnose|antracnos|maculatur|blight/i, "macchieFungo"]
 ];
