@@ -1,0 +1,30 @@
+rules_version = '2';
+// Fronda: il database serve solo ai promemoria.
+// Il telefono può scrivere il proprio documento (nome casuale lungo) ma nessuno può leggere quelli degli altri.
+// I programmi su GitHub usano la chiave di servizio e non passano da queste regole.
+service cloud.firestore {
+  match /databases/{db}/documents {
+    match /config/pubblica {
+      allow read: if true;
+    }
+    match /telefoni/{id} {
+      function valido() {
+        let d = request.resource.data;
+        return id.size() >= 20 && id.size() <= 40
+          && d.keys().hasOnly(['sub', 'ora', 'piante', 'stagioni', 'agg', 'inviato'])
+          && d.sub is string && d.sub.size() < 2000
+          && d.ora is string && d.ora.size() <= 5
+          && d.piante is list && d.piante.size() <= 300
+          && d.stagioni is bool;
+      }
+      function inviatoUguale() {
+        return resource == null
+          ? !('inviato' in request.resource.data)
+          : request.resource.data.get('inviato', '') == resource.data.get('inviato', '');
+      }
+      allow create, update: if valido() && inviatoUguale();
+      allow delete: if id.size() >= 20;
+      allow read: if false;
+    }
+  }
+}

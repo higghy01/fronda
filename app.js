@@ -41,7 +41,7 @@ const DB = {
 };
 
 const IMP_KEY = "fronda-impostazioni";
-let imp = { stagioni: true };
+let imp = { stagioni: true, promemoria: false, ora: "09:00" };
 try { Object.assign(imp, JSON.parse(localStorage.getItem(IMP_KEY)) || {}); } catch (e) {}
 const salvaImp = () => { try { localStorage.setItem(IMP_KEY, JSON.stringify(imp)); } catch (e) {} };
 
@@ -50,7 +50,7 @@ let filtro = "";      // stanza scelta
 let cerca = "";
 let primaVolta = true;
 
-const salva = p => DB.put("piante", p).catch(() => toast("Non riesco a salvare: lo spazio del telefono è pieno?"));
+const salva = p => { aggiornaPromemoria(); return DB.put("piante", p).catch(() => toast("Non riesco a salvare: lo spazio del telefono è pieno?")); };
 
 /* ---------- Calcoli ---------- */
 const inverno = () => { const m = new Date().getMonth(); return m >= 9 || m <= 2; }; // ottobre–marzo
@@ -103,6 +103,7 @@ function render() {
 
   const ordinate = [...piante].sort((a, b) => mancano(a) - mancano(b) || a.nome.localeCompare(b.nome, "it"));
   const oggi = ordinate.filter(p => mancano(p) <= 0);
+  try { if (imp.promemoria && navigator.setAppBadge) oggi.length ? navigator.setAppBadge(oggi.length) : navigator.clearAppBadge(); } catch (e) {}
   const domani = ordinate.filter(p => mancano(p) === 1);
   const tot = piante.length;
   const elencoStanze = stanze();
@@ -421,7 +422,7 @@ function formPianta(p) {
       $("#c-si").onclick = async () => {
         for (const f of await DB.fotoDi(p.id)) await DB.del("foto", f.id);
         await DB.del("piante", p.id);
-        piante = piante.filter(x => x.id !== p.id);
+        piante = piante.filter(x => x.id !== p.id); aggiornaPromemoria();
         chiudiFoglio(); render(); toast("Pianta eliminata");
       };
     };
@@ -491,7 +492,9 @@ function impostazioni() {
     <h3 style="margin-top:4px">Impostazioni</h3>
     ${installata ? "" : `<div class="tip" style="margin-top:14px"><b>Usala come un'app</b>In Safari tocca Condividi, poi "Aggiungi alla schermata Home". Così si apre a tutto schermo, anche senza rete.</div>`}
     <div class="switch"><div><b>Ritmo stagionale</b><small>Da ottobre a marzo usa i giorni "d'inverno", perché le piante bevono meno</small></div><input type="checkbox" id="sw-stag" ${imp.stagioni ? "checked" : ""} aria-label="Ritmo stagionale"></div>
-    <div class="switch"><div><b>Promemoria sul telefono</b><small>In arrivo: un avviso al mattino quando una pianta ha sete</small></div><input type="checkbox" disabled aria-label="Promemoria (in arrivo)"></div>
+    <div class="switch"><div><b>Promemoria del mattino</b><small>${window.FIREBASE_PROGETTO ? "Un avviso sul telefono, solo nei giorni in cui una pianta ha sete" : "In arrivo: un avviso al mattino quando una pianta ha sete"}</small></div><input type="checkbox" id="sw-prom" ${imp.promemoria ? "checked" : ""} ${window.FIREBASE_PROGETTO ? "" : "disabled"} aria-label="Promemoria del mattino"></div>
+    <div class="field" id="ora-box" ${imp.promemoria ? "" : "hidden"} style="margin-top:10px"><label for="sel-ora">A che ora</label><select id="sel-ora">${Array.from({ length: 15 }, (_, i) => String(i + 7).padStart(2, "0") + ":00").map(o => `<option ${o === imp.ora ? "selected" : ""}>${o}</option>`).join("")}</select></div>
+    <div id="prom-msg"></div>
     <div class="block-h">Copia di sicurezza</div>
     <p class="note" style="margin-top:0">Le piante e le foto sono salvate solo su questo telefono. Ogni tanto fai una copia e tienila in File o su iCloud Drive.</p>
     <div class="list-set">
@@ -501,9 +504,20 @@ function impostazioni() {
       <div id="b-conf"></div>
     </div>
     <button class="btn water" id="ok-set" style="margin-top:20px">Fatto</button>
-    <p class="about">Fronda · versione 2 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about">Fronda · versione 3 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `, "Impostazioni");
-  $("#sw-stag").onchange = e => { imp.stagioni = e.target.checked; salvaImp(); render(); };
+  $("#sw-stag").onchange = e => { imp.stagioni = e.target.checked; salvaImp(); render(); aggiornaPromemoria(); };
+  $("#sw-prom").onchange = async e => {
+    const sw = e.target; sw.disabled = true;
+    const msg = t => $("#prom-msg").innerHTML = t ? `<div class="tip" style="margin-top:10px">${t}</div>` : "";
+    msg("");
+    const esito = sw.checked ? await attivaPromemoria() : await spegniPromemoria();
+    if (esito) { msg(esito); sw.checked = !sw.checked; }
+    $("#ora-box").hidden = !imp.promemoria;
+    sw.disabled = false;
+    if (!esito) toast(imp.promemoria ? "Promemoria attivo" : "Promemoria spento");
+  };
+  $("#sel-ora").onchange = e => { imp.ora = e.target.value; salvaImp(); aggiornaPromemoria(true); toast(`Promemoria alle ${imp.ora}`); };
   $("#ok-set").onclick = chiudiFoglio;
   $("#b-salva").onclick = esportaCopia;
   $("#b-file").onchange = e => { const f = e.target.files[0]; if (f) chiediRipristino(f); e.target.value = ""; };
@@ -541,11 +555,72 @@ function chiediRipristino(file) {
       for (const p of d.piante) await DB.put("piante", p);
       for (const f of d.foto || []) { const blob = await (await fetch(f.data)).blob(); await DB.put("foto", { id: f.id, pianta: f.pianta, t: f.t, blob }); }
       if (d.impostazioni) { imp = Object.assign({ stagioni: true }, d.impostazioni); salvaImp(); }
-      piante = await DB.all("piante"); urlFoto.clear();
+      piante = await DB.all("piante"); urlFoto.clear(); aggiornaPromemoria();
       chiudiFoglio(); render(); toast("Copia ripristinata");
     };
   };
   r.readAsText(file);
+}
+
+/* ---------- Promemoria del mattino ----------
+   Il telefono manda al database solo nome, ultima annaffiatura e giorni di ogni pianta (niente foto).
+   Ogni ora un programma su GitHub controlla e manda l'avviso a chi ha una pianta con sete. */
+const FS = percorso => `https://firestore.googleapis.com/v1/projects/${window.FIREBASE_PROGETTO}/databases/(default)/documents/${percorso}`;
+function idTelefono() {
+  let id = null;
+  try { id = localStorage.getItem("fronda-telefono"); } catch (e) {}
+  if (!id) {
+    const a = new Uint8Array(18); crypto.getRandomValues(a);
+    id = [...a].map(x => x.toString(36).padStart(2, "0")).join("").slice(0, 28);
+    try { localStorage.setItem("fronda-telefono", id); } catch (e) {}
+  }
+  return id;
+}
+const giornoISO = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+function campiPromemoria() {
+  const lista = piante.map(p => ({ mapValue: { fields: { n: { stringValue: String(p.nome).slice(0, 40) }, l: { stringValue: giornoISO(p.last) }, e: { integerValue: String(p.e) }, i: { integerValue: String(p.i) } } } }));
+  return { ora: { stringValue: imp.ora || "09:00" }, stagioni: { booleanValue: !!imp.stagioni }, agg: { timestampValue: new Date().toISOString() }, piante: { arrayValue: lista.length ? { values: lista } : {} } };
+}
+async function scriviPromemoria(extra) {
+  const fields = Object.assign(campiPromemoria(), extra || {});
+  const mask = Object.keys(fields).map(k => "updateMask.fieldPaths=" + k).join("&");
+  const r = await fetch(FS("telefoni/" + idTelefono()) + "?" + mask, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields }) });
+  if (!r.ok) throw new Error("scrittura " + r.status);
+}
+let tPromemoria;
+function aggiornaPromemoria(subito) {
+  if (!imp.promemoria || !window.FIREBASE_PROGETTO) return;
+  clearTimeout(tPromemoria);
+  tPromemoria = setTimeout(() => scriviPromemoria().catch(() => {}), subito ? 0 : 1500);
+}
+const b64InByte = s => { const p = "=".repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, c => c.charCodeAt(0)); };
+async function attivaPromemoria() {
+  const installata = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window))
+    return installata ? "Questo telefono non riceve avvisi dalle app web: serve iOS 16.4 o più recente." : "Prima aggiungi Fronda alla schermata Home (Safari → Condividi → \"Aggiungi alla schermata Home\"), poi aprila da lì e accendi il promemoria.";
+  try {
+    if (await Notification.requestPermission() !== "granted") return "Il telefono non ha dato il permesso. Puoi darlo da Impostazioni → Notifiche → Fronda.";
+    const r = await fetch(FS("config/pubblica"));
+    if (!r.ok) return "Il servizio dei promemoria non è ancora pronto. Riprova più tardi.";
+    const chiave = (await r.json()).fields?.vapid?.stringValue;
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64InByte(chiave) });
+    imp.promemoria = true; salvaImp();
+    await scriviPromemoria({ sub: { stringValue: JSON.stringify(sub) } });
+    render();
+    return null;
+  } catch (e) {
+    imp.promemoria = false; salvaImp();
+    return "Non sono riuscito ad accendere il promemoria. Controlla la rete e riprova.";
+  }
+}
+async function spegniPromemoria() {
+  imp.promemoria = false; salvaImp();
+  try { await fetch(FS("telefoni/" + idTelefono()), { method: "DELETE" }); } catch (e) {}
+  try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) {}
+  try { navigator.clearAppBadge && navigator.clearAppBadge(); } catch (e) {}
+  return null;
 }
 
 /* ---------- Avvisi in basso ---------- */

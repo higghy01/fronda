@@ -1,0 +1,4 @@
+firebase-admin==6.5.0
+pywebpush==2.0.0
+py-vapid==1.9.1
+requests==2.32.3
