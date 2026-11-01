@@ -226,7 +226,7 @@ async function scheda(id, senzaAnim) {
   const s = specie(p), m = mancano(p);
   apri(`
     <div class="hero" id="hero">${pic(p)}<button class="close" data-close aria-label="Chiudi">${ICO.x}</button></div>
-    <h3>${esc(p.nome)}</h3><div class="latin">${esc(s.n)}${p.sp !== "altro" ? " · " + esc(s.l) : ""}</div>
+    <h3>${esc(p.nome)}</h3><div class="latin">${p.sp === "altro" ? esc(p.sci || s.n) : esc(s.n) + " · " + esc(p.sci || s.l)}</div>
     <div class="chips">
       <span class="chip">${ICO.drop}Ogni ${ogni(p)} ${ogni(p) === 1 ? "giorno" : "giorni"}${stagioneInv() ? " (inverno)" : ""}</span>
       <span class="chip">${ICO.sun}${esc(s.luce)}</span>
@@ -353,8 +353,8 @@ function formPianta(p) {
   const listaSp = Object.entries(SPECIE).sort((a, b) => a[0] === "altro" ? 1 : b[0] === "altro" ? -1 : a[1].n.localeCompare(b[1].n, "it"));
   apri(`
     <h3 style="margin-top:4px">${nuova ? "Nuova pianta" : "Modifica " + esc(p.nome)}</h3>
-    ${nuova ? `<label class="photo-pick" for="add-foto" id="pick" style="margin-top:14px"><div>${ICO.cam}<b>Scatta o scegli una foto</b><br><small>Facoltativa, puoi aggiungerla dopo</small></div></label>
-    <input type="file" id="add-foto" accept="image/*" hidden>` : ""}
+    ${nuova ? `<label class="photo-pick" for="add-foto" id="pick" style="margin-top:14px"><div>${ICO.cam}<b>Scatta o scegli una foto</b><br><small>${window.PLANTNET_KEY ? "L'app prova a riconoscere la pianta" : "Facoltativa, puoi aggiungerla dopo"}</small></div></label>
+    <input type="file" id="add-foto" accept="image/*" hidden><div id="guess-box"></div>` : ""}
     <div class="field"><label for="sp-cerca">Tipo di pianta</label>
       <input id="sp-cerca" type="search" placeholder="Cerca: monstera, pothos, cactus…" autocomplete="off">
       <div class="sp-list" id="sp-list"></div>
@@ -385,21 +385,33 @@ function formPianta(p) {
     st.sp = k; const s = SPECIE[k];
     if (auto !== false) { st.e = s.e; st.i = s.i; outs(); }
     $("#sp-note").textContent = `${s.n}: ogni ${s.e} giorni d'estate, ${s.i} d'inverno. ${s.luce}.`;
-    if (!$("#f-nome").value) $("#f-nome").placeholder = s.n;
+    if (!$("#f-nome").value) $("#f-nome").placeholder = k === "altro" && st.comune ? st.comune : s.n;
     disegnaLista(); $("#sp-list").scrollTop = 0;
   };
   outs(); disegnaLista();
   if (p) scegli(p.sp, false);
   $("#sp-cerca").oninput = disegnaLista;
-  $("#sp-list").onclick = e => { const b = e.target.closest("[data-sp]"); if (b) scegli(b.dataset.sp); };
+  $("#sp-list").onclick = e => { const b = e.target.closest("[data-sp]"); if (b) { st.sci = ""; st.comune = ""; $$(".guess button").forEach(x => x.classList.remove("sel")); scegli(b.dataset.sp); } };
   $$("[data-st]").forEach(b => b.onclick = () => { const k = b.dataset.st; st[k] = Math.max(1, Math.min(90, st[k] + +b.dataset.d)); outs(); });
   $("#f-annulla").onclick = () => nuova ? chiudiFoglio() : scheda(p.id);
 
   if (nuova) {
     $("#add-foto").onchange = async e => {
       const f = e.target.files[0]; if (!f) return;
-      try { st.foto = await preparaFoto(f); $("#pick").innerHTML = `<img src="${st.foto.thumb}" alt="">`; }
-      catch (er) { toast("Questa foto non si riesce ad aprire. Prova con un'altra."); }
+      const attivo = !!window.PLANTNET_KEY;
+      try { st.foto = await preparaFoto(f); $("#pick").innerHTML = `<img src="${st.foto.thumb}" alt="">${attivo ? `<div class="scan"></div>` : ""}`; }
+      catch (er) { toast("Questa foto non si riesce ad aprire. Prova con un'altra."); return; }
+      if (!attivo) return;
+      $("#guess-box").innerHTML = `<div class="note">Sto riconoscendo la pianta…</div>`;
+      const ris = await riconosci(st.foto.blob);
+      $("#pick .scan")?.remove();
+      if (!$("#guess-box")) return;
+      if (ris.errore) { $("#guess-box").innerHTML = `<div class="note">${esc(ris.errore)}</div>`; return; }
+      $("#guess-box").innerHTML = `<div class="guess">${ris.lista.map((g, i) => `<button data-g="${i}" style="animation-delay:${i * 80}ms"><span><b>${esc(g.nome)}</b><br><small class="latin">${esc(g.sci)}</small></span><span class="pct">${g.pct}%</span></button>`).join("")}</div>
+        <div class="note">Tocca quella giusta, oppure cerca qui sotto.</div>`;
+      const usa = i => { const g = ris.lista[i]; st.sci = g.sci; st.comune = g.sp === "altro" ? g.nome : ""; $$(".guess button").forEach(b => b.classList.toggle("sel", +b.dataset.g === i)); scegli(g.sp); };
+      $$(".guess button").forEach(b => b.onclick = () => usa(+b.dataset.g));
+      if (ris.lista[0].pct >= 40) usa(0);
     };
   } else {
     $("#f-elimina").onclick = () => {
@@ -417,12 +429,12 @@ function formPianta(p) {
 
   $("#f-salva").onclick = async () => {
     if (!st.sp) { toast("Scegli il tipo di pianta (o \"Altra pianta\")"); $("#sp-cerca").focus(); return; }
-    const nome = $("#f-nome").value.trim() || SPECIE[st.sp].n;
+    const nome = $("#f-nome").value.trim() || (st.sp === "altro" && st.comune) || SPECIE[st.sp].n;
     const stanza = $("#f-stanza").value.trim();
     const note = $("#f-note").value.trim();
     if (nuova) {
       const q = +$("#f-quando").value;
-      const np = { id: nuovoId(), nome, sp: st.sp, stanza, e: st.e, i: st.i, note, creata: now(), storia: [], thumb: null, coverId: null };
+      const np = { id: nuovoId(), nome, sp: st.sp, sci: st.sci || "", stanza, e: st.e, i: st.i, note, creata: now(), storia: [], thumb: null, coverId: null };
       np.last = q >= 0 ? inizioGiorno(now()) - q * DAY + 12 * 36e5 : now() - (stagioneInv() ? st.i : st.e) * DAY;
       if (q >= 0) np.storia = [np.last];
       if (st.foto) {
@@ -436,6 +448,40 @@ function formPianta(p) {
       await salva(p); render(); scheda(p.id, true); toast("Salvato");
     }
   };
+}
+
+/* ---------- Riconoscimento dalla foto (Pl@ntNet, gratuito) ---------- */
+function abbina(r) {
+  const sp = r.species || {}, nome = sp.scientificNameWithoutAuthor || "";
+  const gen = sp.genus?.scientificNameWithoutAuthor || nome.split(" ")[0];
+  const fam = sp.family?.scientificNameWithoutAuthor || "";
+  return ABBINA.specie[nome] || ABBINA.genere[gen] || ABBINA.famiglia[fam] || "altro";
+}
+function leggiRisultati(d) {
+  const visti = new Set(), lista = [];
+  for (const r of d.results || []) {
+    const sp = abbina(r), sci = r.species?.scientificNameWithoutAuthor || "";
+    const chiave = sp === "altro" ? sci : sp;
+    if (!sci || visti.has(chiave)) continue; visti.add(chiave);
+    const comune = (r.species?.commonNames || [])[0];
+    lista.push({ sp, sci, pct: Math.max(1, Math.round(r.score * 100)), nome: sp === "altro" ? (comune ? comune[0].toUpperCase() + comune.slice(1) : sci) : SPECIE[sp].n });
+    if (lista.length === 3) break;
+  }
+  return lista;
+}
+async function riconosci(blob) {
+  if (!navigator.onLine) return { errore: "Senza rete non posso riconoscerla: scegli il tipo dall'elenco." };
+  const fd = new FormData(); fd.append("images", blob, "pianta.jpg"); fd.append("organs", "auto");
+  try {
+    const ctl = new AbortController(); const tmo = setTimeout(() => ctl.abort(), 20000);
+    const res = await fetch(`https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(window.PLANTNET_KEY)}&lang=it&nb-results=5`, { method: "POST", body: fd, signal: ctl.signal });
+    clearTimeout(tmo);
+    if (res.status === 404) return { errore: "Non l'ho riconosciuta. Prova una foto più vicina alle foglie, oppure scegli dall'elenco." };
+    if (res.status === 429) return { errore: "Per oggi il riconoscimento ha finito i tentativi gratuiti: scegli dall'elenco." };
+    if (!res.ok) return { errore: "Il riconoscimento non risponde: scegli il tipo dall'elenco." };
+    const lista = leggiRisultati(await res.json());
+    return lista.length ? { lista } : { errore: "Non l'ho riconosciuta: scegli il tipo dall'elenco." };
+  } catch (e) { return { errore: "Il riconoscimento non risponde: scegli il tipo dall'elenco." }; }
 }
 
 /* ---------- Impostazioni e copia di sicurezza ---------- */
@@ -455,7 +501,7 @@ function impostazioni() {
       <div id="b-conf"></div>
     </div>
     <button class="btn water" id="ok-set" style="margin-top:20px">Fatto</button>
-    <p class="about">Fronda · versione 1 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about">Fronda · versione 2 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `, "Impostazioni");
   $("#sw-stag").onchange = e => { imp.stagioni = e.target.checked; salvaImp(); render(); };
   $("#ok-set").onclick = chiudiFoglio;

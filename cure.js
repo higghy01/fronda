@@ -40,3 +40,11 @@ window.SPECIE = {
   bonsai:{n:"Bonsai",l:"Ficus ginseng e simili",e:3,i:5,luce:"Luce forte",umid:"Ama l'umidità",art:"coin",c:["#2E6A3A","#5E9E52"],tip:"Vaso piccolo, si asciuga in fretta: controlla spesso la terra."},
   altro:{n:"Altra pianta",l:"Tipo non in elenco",e:7,i:10,luce:"Luce indiretta",umid:"Normale",art:"monstera",c:["#356B42","#5E9A63"],tip:"Tocca la terra con un dito: se i primi 2–3 cm sono asciutti, è ora di annaffiare. Puoi cambiare i giorni quando vuoi."}
 };
+
+/* Collega i nomi scientifici restituiti dal riconoscimento (Pl@ntNet) alle nostre schede.
+   Prima la specie esatta, poi il genere, poi la famiglia. */
+window.ABBINA = {
+  specie: {"Dracaena trifasciata":"sansevieria","Sansevieria trifasciata":"sansevieria","Ficus elastica":"ficus","Ficus lyrata":"ficuslyrata","Ficus benjamina":"benjamin","Ficus microcarpa":"bonsai","Crassula ovata":"crassula","Euphorbia pulcherrima":"stellanatale","Salvia rosmarinus":"rosmarino","Rosmarinus officinalis":"rosmarino","Aloe vera":"aloe","Spathiphyllum wallisii":"spatifillo"},
+  genere: {Monstera:"monstera",Epipremnum:"pothos",Scindapsus:"pothos",Philodendron:"filodendro",Thaumatophyllum:"filodendro",Sansevieria:"sansevieria",Zamioculcas:"zamioculcas",Ficus:"ficus",Spathiphyllum:"spatifillo",Goeppertia:"calathea",Calathea:"calathea",Ctenanthe:"calathea",Stromanthe:"calathea",Maranta:"maranta",Aloe:"aloe",Echeveria:"succulenta",Sedum:"succulenta",Haworthia:"succulenta",Haworthiopsis:"succulenta",Kalanchoe:"succulenta",Graptopetalum:"succulenta",Crassula:"crassula",Phalaenopsis:"orchidea",Pilea:"pilea",Peperomia:"peperomia",Nephrolepis:"felce",Asplenium:"felce",Adiantum:"felce",Chlorophytum:"chlorophytum",Dracaena:"dracena",Yucca:"yucca",Howea:"kentia",Dypsis:"areca",Chamaedorea:"kentia",Strelitzia:"strelitzia",Anthurium:"anthurium",Alocasia:"alocasia",Colocasia:"alocasia",Hedera:"edera",Tradescantia:"tradescantia",Begonia:"begonia",Cyclamen:"ciclamino",Ocimum:"basilico",Mentha:"menta"},
+  famiglia: {Cactaceae:"cactus",Crassulaceae:"succulenta",Orchidaceae:"orchidea",Nephrolepidaceae:"felce",Polypodiaceae:"felce",Pteridaceae:"felce",Aspleniaceae:"felce",Arecaceae:"kentia",Marantaceae:"calathea"}
+};
