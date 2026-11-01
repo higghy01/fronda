@@ -1,5 +1,5 @@
 /* Disegni delle piante (SVG fatti a mano), usati finché una pianta non ha una foto. */
-function art(kind,c,seed=1){
+function art(kind,c,seed=1,sete=false){
   const [d,l]=c, pot=`<path d="M70 150h60l-7 42H77z" fill="#B9774E"/><rect x="64" y="142" width="72" height="13" rx="4" fill="#CC8A5E"/>`;
   let g="",front="";
   const R=(a,b)=>a+((Math.sin(seed*97.13+a*7.7+b)*.5+.5)*(b-a));
@@ -41,5 +41,15 @@ function art(kind,c,seed=1){
     <rect width="200" height="200" fill="var(--surface-2)"/>
     <circle cx="${R(40,160)}" cy="${R(30,80)}" r="70" fill="${l}" opacity=".12"/>
     <ellipse cx="100" cy="194" rx="56" ry="6" fill="#000" opacity=".08"/>
-    <g class="sway" style="animation-delay:-${R(0,6).toFixed(1)}s">${g}</g>${pot}${front}</svg>`;
+    <g class="sway" style="animation-delay:-${R(0,6).toFixed(1)}s">${g}</g>${pot}${faccina(sete,seed)}${front}</svg>`;
+}
+
+/* La faccina sul vaso: sorride quando sta bene, è triste quando ha sete; sbatte gli occhi ogni tanto */
+function faccina(sete,seed){
+  const ritardo=(seed%7)*.6;
+  const bocca=sete?`<path d="M94 181 q6 -4.5 12 0" stroke="#5A3420" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
+                  :`<path d="M94 177 q6 5.5 12 0" stroke="#5A3420" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
+  const goccia=sete?`<path class="sudore" d="M121 160 c0 0 3.5 4.5 3.5 6.6 a3.5 3.5 0 0 1 -7 0 c0 -2.1 3.5 -6.6 3.5 -6.6z" fill="#7CC4FF"/>`:"";
+  return `<g class="faccia${sete?" triste":""}"><circle cx="86" cy="176" r="3.6" fill="#F08F7A" opacity=".55"/><circle cx="114" cy="176" r="3.6" fill="#F08F7A" opacity=".55"/>
+    <g class="occhi" style="animation-delay:${ritardo}s"><circle cx="93" cy="169" r="2.5" fill="#3A2214"/><circle cx="107" cy="169" r="2.5" fill="#3A2214"/></g>${bocca}${goccia}</g>`;
 }

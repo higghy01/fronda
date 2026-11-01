@@ -118,24 +118,38 @@ const semeDi = p => { let h = 0; for (const ch of p.id) h = (h * 31 + ch.charCod
 const TINTE = ["#C25E1C", "#2A7FD4", "#9A50B8", "#9A7209", "#C2456A", "#1F8A80", "#6A5FD8"];
 // colori dati in ordine alfabetico delle stanze: due stanze vicine non hanno mai lo stesso colore
 const tintaStanza = s => { const i = stanze().indexOf(String(s || "").trim()); return TINTE[(i < 0 ? 0 : i) % TINTE.length]; };
-const pic = p => p.thumb ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : art(specie(p).art, specie(p).c, semeDi(p));
+const pic = p => p.thumb ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : art(specie(p).art, specie(p).c, semeDi(p), mancano(p) <= 0);
 
-/* ---------- Schermata principale ---------- */
-function render() {
-  $("#today-date").textContent = new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
-  const main = $("#main");
-  main.classList.toggle("still", !primaVolta);
-  primaVolta = false;
-
-  if (!piante.length) {
-    main.innerHTML = `<section class="empty">
-      <div class="ill">${art("monstera", SPECIE.monstera.c, 3)}</div>
+/* ---------- Le schede dell'app: Oggi, Piante, Impostazioni ----------
+   Come un'app vera: la pagina sta ferma, scorre solo il contenuto della scheda aperta, sotto c'è la barra delle schede. */
+const ICO_PIU = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
+const ICO_GIU = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
+function saluto() {
+  const h = new Date().getHours();
+  return h < 6 ? ["Buonanotte", "🌙"] : h < 13 ? ["Buongiorno", "☀️"] : h < 18 ? ["Buon pomeriggio", "🌤️"] : ["Buonasera", "🌙"];
+}
+const oggiData = () => new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+const testa = (titolo, extra) => `<header class="top"><div><div class="date">${esc(oggiData())}</div><h1 class="titolo">${titolo}</h1></div>
+  <div class="top-b">${extra || ""}<button class="round-btn piu" data-add aria-label="Aggiungi una pianta">${ICO_PIU}</button></div></header>`;
+const vuoto = () => `<section class="empty">
+      <div class="ill rimbalza">${art("monstera", SPECIE.monstera.c, 3)}</div>
       <h2>Iniziamo dalla prima pianta</h2>
       <p>Fai una foto, scegli il tipo e Rigo ti dice quando annaffiarla.</p>
-      <button class="btn water" id="empty-add" style="max-width:280px">Aggiungi una pianta</button>
+      <button class="btn water" data-add style="max-width:280px">Aggiungi una pianta</button>
     </section>`;
-    $("#empty-add").onclick = () => formPianta();
+let sete = -1;   // quante avevano sete al giro prima: se si passa a zero, si fa festa
+
+function render() {
+  const vo = $("#v-oggi"), vp = $("#v-piante");
+  [vo, vp].forEach(v => v.classList.toggle("still", !primaVolta));
+  primaVolta = false;
+  const [ciao, em] = saluto();
+
+  if (!piante.length) {
+    vo.innerHTML = testa(`${ciao} <span class="em">${em}</span>`) + consiglioHome() + vuoto();
+    vp.innerHTML = testa("Le tue piante") + vuoto();
     document.body.classList.add("vuota");
+    contatore(0); sete = 0;
     return;
   }
 
@@ -143,14 +157,15 @@ function render() {
   const ordinate = [...piante].sort((a, b) => mancano(a) - mancano(b) || a.nome.localeCompare(b.nome, "it"));
   const oggi = ordinate.filter(p => mancano(p) <= 0);
   try { if (imp.promemoria && navigator.setAppBadge) oggi.length ? navigator.setAppBadge(oggi.length) : navigator.clearAppBadge(); } catch (e) {}
+  const prossime = ordinate.filter(p => mancano(p) >= 1).slice(0, 5);
   const domani = ordinate.filter(p => mancano(p) === 1);
   const tot = piante.length;
   const elencoStanze = stanze();
   if (filtro && !elencoStanze.includes(filtro)) filtro = "";
 
-  main.innerHTML = `${consiglioHome()}
+  vo.innerHTML = `${testa(`${ciao} <span class="em">${em}</span>`)}${consiglioHome()}
   <section class="today" data-k="today">
-    ${ring(1 - oggi.length / tot, `${tot - oggi.length}/${tot}`, true).replace('class="ring"', 'class="ring gauge"')}
+    ${ring(1 - oggi.length / tot, `${tot - oggi.length}/${tot}`, true).replace('class="ring', 'class="ring gauge')}
     <div><b>${oggi.length ? `${oggi.length === 1 ? "Una pianta ha" : oggi.length + " piante hanno"} sete oggi` : "Tutte a posto oggi"}</b>
     <span>${oggi.length ? "Sono qui sotto, in ordine" : domani.length ? `Domani: ${esc(domani.slice(0, 3).map(p => p.nome).join(", "))}${domani.length > 3 ? ` e altre ${domani.length - 3}` : ""}` : "Nessuna annaffiatura domani"}${stagioneInv() ? " · ritmo invernale" : ""}</span></div>
     <svg class="waves" viewBox="0 0 400 10" preserveAspectRatio="none" aria-hidden="true"><path d="M0 6 Q25 0 50 6 T100 6 T150 6 T200 6 T250 6 T300 6 T350 6 T400 6 V10 H0z" fill="var(--water-soft)"/></svg>
@@ -158,15 +173,25 @@ function render() {
 
   ${oggi.length ? `<div class="section-h" data-k="h-oggi"><h2>Da annaffiare</h2><small>${oggi.length}</small></div>
   <div class="thirsty" id="thirsty">
-    ${oggi.map((p, i) => `<div class="trow" style="--i:${i}" data-id="${esc(p.id)}">
+    ${oggi.map((p, i) => `<div class="trow" style="--i:${i}" data-id="${esc(p.id)}" data-k="t-${esc(p.id)}">
       <button class="mini" data-open="${esc(p.id)}" aria-label="Apri ${esc(p.nome)}">${pic(p)}</button>
       <button class="t" data-open="${esc(p.id)}" style="text-align:left"><b>${esc(p.nome)}</b><small>${mancano(p) < 0 ? `in ritardo di ${-mancano(p)} ${mancano(p) === -1 ? "giorno" : "giorni"}` : "oggi"}${p.stanza ? " · " + esc(p.stanza) : ""}</small></button>
       <button class="wbtn" data-water="${esc(p.id)}">${ICO.drop}Fatto</button>
     </div>`).join("")}
     ${oggi.length > 1 ? `<button class="allbtn" id="water-all">Le ho annaffiate tutte</button>` : ""}
-  </div>` : ""}
+  </div>` : `<section class="felici" data-k="felici">
+    <div class="felici-ill">${art(piante[0] ? specie(ordinate[0]).art : "monstera", piante[0] ? specie(ordinate[0]).c : SPECIE.monstera.c, 5)}</div>
+    <div><b>Tutte felici</b><span>Oggi non c'è niente da annaffiare. Goditi il verde.</span></div>
+  </section>`}
 
-  <div class="section-h" data-k="h-casa"><h2>In casa</h2><small>${tot} ${tot === 1 ? "pianta" : "piante"}</small></div>
+  ${prossime.length ? `<div class="section-h" data-k="h-pross"><h2>Nei prossimi giorni</h2></div>
+  <div class="lista">${prossime.map((p, i) => { const m = mancano(p);
+    return `<button class="riga" data-open="${esc(p.id)}" data-k="r-${esc(p.id)}" style="--i:${i}">
+      <span class="mini">${pic(p)}</span><span class="t"><b>${esc(p.nome)}</b><small>${esc(p.stanza || specie(p).n)}</small></span>
+      <span class="quando ${m === 1 ? "presto" : ""}">${m === 1 ? "domani" : `tra ${m} giorni`}</span>${ICO_GIU}</button>`; }).join("")}</div>` : ""}`;
+
+  vp.innerHTML = `${testa("Le tue piante")}
+  <div class="section-h" data-k="h-casa" style="margin-top:14px"><h2>In casa</h2><small>${tot} ${tot === 1 ? "pianta" : "piante"}</small></div>
   ${tot > 6 || elencoStanze.length > 1 ? `<div class="tools" data-k="tools" style="margin-top:0;margin-bottom:12px">
     ${tot > 6 ? `<div class="search">${ICO.search}<input id="cerca" type="search" placeholder="Cerca per nome, tipo o stanza" value="${esc(cerca)}" autocomplete="off" enterkeyhint="search"></div>` : ""}
     ${elencoStanze.length > 1 ? `<div class="rooms">${["", ...elencoStanze].map(s => `<button class="chip-f" data-room="${esc(s)}" aria-pressed="${s === filtro}"${s ? ` style="--t:${tintaStanza(s)}"` : ""}>${s ? `<i class="dot"></i>${esc(s)}` : "Tutte"}</button>`).join("")}</div>` : ""}
@@ -180,6 +205,60 @@ function render() {
   $$("[data-room]").forEach(b => b.onclick = () => { filtro = b.dataset.room; tocco(); morbido(render); });
   const all = $("#water-all");
   if (all) all.onclick = () => annaffiaTutte(oggi);
+  contatore(oggi.length);
+  if (sete > 0 && oggi.length === 0) festa();
+  sete = oggi.length;
+}
+
+/* Il numerino rosso sulla scheda Oggi: rimbalza quando cambia */
+function contatore(n) {
+  const el = $("#tab-n"); if (!el) return;
+  const prima = el.textContent;
+  el.textContent = n ? String(n) : "";
+  el.classList.toggle("on", n > 0);
+  if (n && prima !== String(n) && el.animate && !pocoMoto()) el.animate([{ transform: "scale(.4)" }, { transform: "scale(1.25)" }, { transform: "scale(1)" }], { duration: 450, easing: "cubic-bezier(.34,1.56,.64,1)" });
+}
+
+/* Festa: quando l'ultima pianta assetata è stata annaffiata cadono foglioline e gocce */
+function festa() {
+  if (pocoMoto()) return;
+  const box = document.createElement("div"); box.className = "festa"; box.setAttribute("aria-hidden", "true");
+  const pezzi = ["🍃", "💧", "🌿", "💚", "🍃", "💧"];
+  for (let k = 0; k < 22; k++) {
+    const e = document.createElement("span");
+    e.textContent = pezzi[k % pezzi.length];
+    e.style.cssText = `left:${Math.random() * 100}%;font-size:${16 + Math.random() * 14}px;animation-delay:${Math.random() * .5}s;animation-duration:${1.6 + Math.random() * 1.2}s;--r:${(Math.random() * 2 - 1) * 260}deg;--x:${(Math.random() * 2 - 1) * 60}px`;
+    box.appendChild(e);
+  }
+  document.body.appendChild(box);
+  setTimeout(() => box.remove(), 3400);
+}
+
+/* Cambio scheda con una scivolata (verso destra o sinistra a seconda dell'ordine) */
+const SCHEDE = ["oggi", "piante", "imp"];
+let tabAttiva = "oggi";
+function vai(tab) {
+  if (tab === tabAttiva) { const v = $("#v-" + tab); v.scrollTo({ top: 0, behavior: pocoMoto() ? "auto" : "smooth" }); return; }
+  const da = $("#v-" + tabAttiva), a = $("#v-" + tab), dir = SCHEDE.indexOf(tab) > SCHEDE.indexOf(tabAttiva) ? 1 : -1;
+  tabAttiva = tab;
+  if (tab === "imp") impostazioni();
+  $$(".tab").forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+  $("#tabbar").style.setProperty("--k", SCHEDE.indexOf(tab));
+  da.classList.remove("on"); a.classList.add("on");
+  barraTitolo();
+  if (!pocoMoto() && a.animate) {
+    a.animate([{ opacity: 0, transform: `translateX(${dir * 28}px)` }, { opacity: 1, transform: "none" }], { duration: 380, easing: MOLLA });
+    da.animate([{ opacity: 1, visibility: "visible", transform: "none" }, { opacity: 0, visibility: "visible", transform: `translateX(${-dir * 28}px)` }], { duration: 220, easing: "ease-out" });
+  }
+  const ic = $(`.tab[data-tab="${tab}"] svg`);
+  if (ic && ic.animate && !pocoMoto()) ic.animate([{ transform: "scale(1)" }, { transform: "scale(.78) translateY(2px)" }, { transform: "scale(1.15) translateY(-3px)" }, { transform: "scale(1)" }], { duration: 520, easing: "ease-out" });
+  tocco();
+}
+/* Barra piccola in vetro: compare quando il titolo grande della scheda è scorso via */
+function barraTitolo() {
+  const v = $("#v-" + tabAttiva), h = v.querySelector(".titolo");
+  $("#nav-t").textContent = h ? h.textContent.replace(/[^\p{L}\s']/gu, "").trim() : "";
+  $("#navbar").classList.toggle("on", v.scrollTop > 56);
 }
 
 /* Le piante disegnate ondeggiano solo quando si vedono: con 50 piante il telefono resta fluido */
@@ -193,7 +272,7 @@ function consiglioHome() {
   if (installata() || consiglioChiuso()) return "";
   return `<div class="tip home-tip" data-k="tip"><button class="tip-x" id="tip-x" aria-label="Chiudi il consiglio">${ICO.x}</button><b>Mettila sulla Home</b>In Safari tocca Condividi, poi "Aggiungi alla schermata Home": si apre a tutto schermo e le piante restano salvate al sicuro.</div>`;
 }
-$("#main").addEventListener("click", e => {
+$("#app").addEventListener("click", e => {
   if (!e.target.closest("#tip-x")) return;
   try { localStorage.setItem("rigo-consiglio-home", "1"); } catch (er) {}
   morbido(render);
@@ -210,7 +289,7 @@ function griglia(ordinate) {
     </button>`; }).join("") || `<div class="nores">Nessuna pianta trovata</div>`;
 }
 
-$("#main").addEventListener("click", e => {
+$("#app").addEventListener("click", e => {
   const w = e.target.closest("[data-water]");
   if (w) { const p = piante.find(x => x.id === w.dataset.water); const row = w.closest(".trow"); if (!p || row.classList.contains("gone")) return; tocco(); row.classList.add("gone"); setTimeout(() => annaffia(p), 280); return; }
   const o = e.target.closest("[data-open]");
@@ -225,9 +304,9 @@ const pocoMoto = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 function morbido(fn) {
   if (pocoMoto() || !Element.prototype.animate) return fn();
   const prima = new Map();
-  $$("#main [data-k]").forEach(el => prima.set(el.dataset.k, el.getBoundingClientRect()));
+  $$(".vista.on [data-k]").forEach(el => prima.set(el.dataset.k, el.getBoundingClientRect()));
   fn();
-  $$("#main [data-k]").forEach(el => {
+  $$(".vista.on [data-k]").forEach(el => {
     const r0 = prima.get(el.dataset.k), r1 = el.getBoundingClientRect();
     if (!r0) { el.animate([{ opacity: 0, transform: "scale(.94)" }, { opacity: 1, transform: "none" }], { duration: 420, easing: MOLLA, delay: 80, fill: "backwards" }); return; }
     const dx = r0.left - r1.left, dy = r0.top - r1.top;
@@ -288,7 +367,6 @@ function apri(html, label) {
 /* Con un foglio aperto la pagina dietro si rimpicciolisce un po', come le schede dell'iPhone */
 function sfondo(on) {
   const a = $("#app"), r = document.documentElement;
-  if (on && !r.classList.contains("aperto")) a.style.transformOrigin = `50% ${scrollY + innerHeight / 2}px`;
   r.classList.toggle("aperto", on);
 }
 function chiudiFoglio() { if (foglioAperto) history.back(); }
@@ -637,7 +715,10 @@ function diagnosi(p, scelti, dallaFoto) {
   };
   scelti.forEach(id => { const sin = SINTOMI.find(x => x.id === id); if (sin) sin.c(r, s).forEach(([k, w, perche]) => aggiungi(k, w, perche)); });
   (dallaFoto || []).forEach(f => aggiungi(f.k, f.pct >= 30 ? 4 : 2, `Lo vedo anche nella foto (${f.pct}%).`));
-  return [...punti.values()].sort((a, b) => b.w - a.w).slice(0, 3);
+  const lista = [...punti.values()].sort((a, b) => b.w - a.w).slice(0, 3);
+  // "Probabile" solo alla prima, e solo se è chiaramente davanti alle altre: le altre sono "Possibile"
+  lista.forEach((x, i) => x.alta = i === 0 && x.w >= 3 && (!lista[1] || x.w - lista[1].w >= 2));
+  return lista;
 }
 function salute(p) {
   const conFoto = !!window.PLANTNET_KEY, scelti = new Set(); let foto = null;
@@ -680,7 +761,7 @@ function salute(p) {
     vai.textContent = "Vedi cosa può essere"; pronto();
     box.innerHTML = `${avviso ? `<p class="note" style="margin-top:14px">${esc(avviso)}</p>` : ""}
       ${esito.length ? esito.map((x, i) => `<div class="diag" style="--i:${i}">
-        <div class="diag-h"><b>${esc(PROBLEMI[x.k].t)}</b><span class="pill ${x.w >= 3 ? "alta" : ""}">${x.w >= 3 ? "Probabile" : "Possibile"}</span></div>
+        <div class="diag-h"><b>${esc(PROBLEMI[x.k].t)}</b><span class="pill ${x.alta ? "alta" : ""}">${x.alta ? "Probabile" : "Possibile"}</span></div>
         ${[...x.perche].map(t => `<p class="diag-p">${esc(t)}</p>`).join("")}
         <ol>${PROBLEMI[x.k].r.map(t => `<li>${esc(t)}</li>`).join("")}</ol>
       </div>`).join("") : `<div class="diag"><div class="diag-h"><b>Non vedo problemi chiari</b></div><p class="diag-p">Se qualcosa ti preoccupa, scegli cosa vedi qui sopra oppure prova una foto più da vicino.</p></div>`}
@@ -692,8 +773,8 @@ function salute(p) {
 /* ---------- Impostazioni e copia di sicurezza ---------- */
 function impostazioni() {
   const installata = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-  apri(`
-    <h3 style="margin-top:4px">Impostazioni</h3>
+  $("#v-imp").innerHTML = (`
+    <header class="top"><div><div class="date">${esc(oggiData())}</div><h1 class="titolo">Impostazioni</h1></div></header>
     ${installata ? "" : `<div class="tip" style="margin-top:14px"><b>Usala come un'app</b>In Safari tocca Condividi, poi "Aggiungi alla schermata Home". Così si apre a tutto schermo, anche senza rete.</div>`}
     <div class="group">
     <div class="switch"><div><b>Ritmo stagionale</b><small>Da ottobre a marzo usa i giorni "d'inverno", perché le piante bevono meno</small></div><input type="checkbox" id="sw-stag" ${imp.stagioni ? "checked" : ""} aria-label="Ritmo stagionale"></div>
@@ -709,9 +790,8 @@ function impostazioni() {
       <input type="file" id="b-file" accept="application/json,.json" hidden>
       <div id="b-conf"></div>
     </div>
-    <button class="btn water" id="ok-set" style="margin-top:20px">Fatto</button>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 5 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
-  `, "Impostazioni");
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+  `);
   $("#sw-stag").onchange = e => { imp.stagioni = e.target.checked; salvaImp(); render(); aggiornaPromemoria(); };
   $("#sw-prom").onchange = async e => {
     const sw = e.target; sw.disabled = true;
@@ -724,7 +804,6 @@ function impostazioni() {
     if (!esito) toast(imp.promemoria ? "Promemoria attivo" : "Promemoria spento");
   };
   $("#sel-ora").onchange = e => { imp.ora = e.target.value; salvaImp(); aggiornaPromemoria(true); toast(`Promemoria alle ${imp.ora}`); };
-  $("#ok-set").onclick = chiudiFoglio;
   $("#b-salva").onclick = esportaCopia;
   $("#b-file").onchange = e => { const f = e.target.files[0]; if (f) chiediRipristino(f); e.target.value = ""; };
 }
@@ -780,7 +859,7 @@ function chiediRipristino(file) {
         // il promemoria resta quello di questo telefono: l'iscrizione agli avvisi non viaggia con la copia
         if (d.impostazioni) { imp = Object.assign({}, imp, { stagioni: d.impostazioni.stagioni !== false, ora: d.impostazioni.ora || imp.ora }); salvaImp(); }
         piante = await DB.all("piante"); liberaFoto(); aggiornaPromemoria();
-        chiudiFoglio(); render(); toast("Copia ripristinata");
+        chiudiFoglio(); render(); vai("oggi"); toast("Copia ripristinata");
       } catch (er) {
         b.disabled = false; b.textContent = "Ripristina";
         toast("Ripristino non riuscito: le piante di prima sono ancora tutte qui");
@@ -895,24 +974,16 @@ function toast(t, annulla) {
 /* ---------- Avvio ---------- */
 document.addEventListener("gesturestart", e => e.preventDefault());
 document.addEventListener("visibilitychange", () => { if (!document.hidden && piante.length) render(); });
-$("#open-add").onclick = () => formPianta();
-
-/* Titolo grande che, scorrendo, diventa la barra piccola in alto (come nelle app Apple);
-   il pulsante Aggiungi si fa tondo quando si scorre giù e torna largo quando si risale */
-(() => {
-  const nav = $("#navbar"), fab = $("#open-add"), tit = $("#titolo");
-  if ("IntersectionObserver" in window) new IntersectionObserver(([e]) => nav.classList.toggle("on", !e.isIntersecting), { rootMargin: "-8px 0px 0px 0px" }).observe(tit);
-  let ultimo = scrollY, attesa = false;
-  addEventListener("scroll", () => {
-    if (attesa) return; attesa = true;
-    requestAnimationFrame(() => {
-      const y = scrollY;
-      if (Math.abs(y - ultimo) > 6) { fab.classList.toggle("small", y > ultimo && y > 120); ultimo = y; }
-      attesa = false;
-    });
+// "+" in alto e nello stato vuoto, barra delle schede, barra piccola che compare scorrendo
+$("#app").addEventListener("click", e => { if (e.target.closest("[data-add]")) { tocco(); formPianta(); } });
+$$(".tab").forEach(b => b.onclick = () => vai(b.dataset.tab));
+$$(".vista").forEach(v => {
+  let attesa = false;
+  v.addEventListener("scroll", () => {
+    if (attesa || !v.classList.contains("on")) return; attesa = true;
+    requestAnimationFrame(() => { barraTitolo(); attesa = false; });
   }, { passive: true });
-})();
-$("#open-settings").onclick = impostazioni;
+});
 
 (async () => {
   try {
