@@ -2,11 +2,31 @@
 solo se almeno una pianta ha sete. Stesse regole dell'app (app.js: ogni, mancano)."""
 import datetime as dt
 import json
+import time
+from urllib.parse import urlparse
 
 from py_vapid import Vapid
 from pywebpush import WebPushException, webpush
 
 from comune import adesso, database
+
+# Gli unici servizi a cui si mandano gli avvisi (Apple, Google, Mozilla, Microsoft): le regole del database fanno lo stesso controllo.
+SERVIZI = ("web.push.apple.com", "fcm.googleapis.com", "updates.push.services.mozilla.com")
+# GitHub ferma il programma dopo 5 minuti: ci si ferma prima, gli altri telefoni al giro dopo.
+TEMPO_MAX = 4 * 60
+
+
+def iscrizione(t):
+    """L'iscrizione del telefono, solo se punta a un servizio di notifica vero; altrimenti None."""
+    try:
+        sub = json.loads(t["sub"])
+        indirizzo = urlparse(sub["endpoint"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    host = indirizzo.hostname or ""
+    if indirizzo.scheme == "https" and (host in SERVIZI or host.endswith(".notify.windows.com")):
+        return sub
+    return None
 
 
 def inverno(giorno):
@@ -45,9 +65,18 @@ def main():
     ora = adesso()
     oggi = ora.date().isoformat()
     mandati = 0
+    inizio = time.monotonic()
     for doc in db.collection("telefoni").stream():
+        if time.monotonic() - inizio > TEMPO_MAX:
+            print("Tempo finito: gli altri al prossimo giro.")
+            break
         t = doc.to_dict()
         if t.get("inviato") == oggi:
+            continue
+        sub = iscrizione(t)
+        if sub is None:
+            doc.reference.delete()
+            print("Iscrizione non valida, tolta.")
             continue
         try:
             ora_scelta = int(str(t.get("ora", "09:00")).split(":")[0])
@@ -59,8 +88,8 @@ def main():
         if sete:
             corpo = {"title": "Fronda", "body": testo(sete), "tag": f"acqua-{oggi}"}
             try:
-                webpush(json.loads(t["sub"]), json.dumps(corpo), vapid_private_key=vapid,
-                        vapid_claims={"sub": "https://higghy01.github.io/fronda/"}, ttl=6 * 3600)
+                webpush(sub, json.dumps(corpo), vapid_private_key=vapid,
+                        vapid_claims={"sub": "https://higghy01.github.io/fronda/"}, ttl=6 * 3600, timeout=10)
                 mandati += 1
             except WebPushException as e:
                 stato = getattr(e.response, "status_code", None)
@@ -69,6 +98,9 @@ def main():
                     print("Iscrizione scaduta, tolta.")
                     continue
                 print(f"Invio non riuscito ({stato}).")
+                continue
+            except Exception as e:  # rete lenta o servizio giù: si riprova al giro dopo
+                print(f"Invio non riuscito ({type(e).__name__}).")
                 continue
         doc.reference.update({"inviato": oggi})
     print(f"Promemoria mandati: {mandati}.")
