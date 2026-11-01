@@ -148,7 +148,7 @@ function render() {
   const elencoStanze = stanze();
   if (filtro && !elencoStanze.includes(filtro)) filtro = "";
 
-  main.innerHTML = `
+  main.innerHTML = `${consiglioHome()}
   <section class="today" data-k="today">
     ${ring(1 - oggi.length / tot, `${tot - oggi.length}/${tot}`, true).replace('class="ring"', 'class="ring gauge"')}
     <div><b>${oggi.length ? `${oggi.length === 1 ? "Una pianta ha" : oggi.length + " piante hanno"} sete oggi` : "Tutte a posto oggi"}</b>
@@ -185,6 +185,19 @@ function render() {
 /* Le piante disegnate ondeggiano solo quando si vedono: con 50 piante il telefono resta fluido */
 const vista = "IntersectionObserver" in window ? new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle("vis", e.isIntersecting)), { rootMargin: "60px" }) : null;
 function osserva() { if (vista) vista.disconnect(); $$("#grid .card").forEach(c => vista ? vista.observe(c) : c.classList.add("vis")); }
+
+/* Finché non è sulla Home, Safari può cancellare i dati dopo 7 giorni senza visite: lo diciamo anche qui */
+const installata = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+function consiglioChiuso() { try { return localStorage.getItem("rigo-consiglio-home") === "1"; } catch (e) { return false; } }
+function consiglioHome() {
+  if (installata() || consiglioChiuso()) return "";
+  return `<div class="tip home-tip" data-k="tip"><button class="tip-x" id="tip-x" aria-label="Chiudi il consiglio">${ICO.x}</button><b>Mettila sulla Home</b>In Safari tocca Condividi, poi "Aggiungi alla schermata Home": si apre a tutto schermo e le piante restano salvate al sicuro.</div>`;
+}
+$("#main").addEventListener("click", e => {
+  if (!e.target.closest("#tip-x")) return;
+  try { localStorage.setItem("rigo-consiglio-home", "1"); } catch (er) {}
+  morbido(render);
+});
 
 function griglia(ordinate) {
   const q = cerca.trim().toLowerCase();
@@ -610,7 +623,7 @@ function impostazioni() {
       <div id="b-conf"></div>
     </div>
     <button class="btn water" id="ok-set" style="margin-top:20px">Fatto</button>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 4.1 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 4.2 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `, "Impostazioni");
   $("#sw-stag").onchange = e => { imp.stagioni = e.target.checked; salvaImp(); render(); aggiornaPromemoria(); };
   $("#sw-prom").onchange = async e => {
@@ -633,18 +646,27 @@ const blobInData = b => new Promise(ok => { const r = new FileReader(); r.onload
 async function esportaCopia() {
   const b = $("#b-salva"); b.textContent = "Preparo la copia…"; b.disabled = true;
   try {
+    // il file si costruisce a pezzi (una foto alla volta): niente stringa enorme in memoria con tante foto
+    const testa = JSON.stringify({ app: "fronda", versione: 1, creata: new Date().toISOString(), impostazioni: imp, piante });
+    const pezzi = [testa.slice(0, -1) + ',"foto":['];
     const foto = await DB.all("foto");
-    const dati = { app: "fronda", versione: 1, creata: new Date().toISOString(), impostazioni: imp, piante,
-      foto: await Promise.all(foto.map(async f => ({ id: f.id, pianta: f.pianta, t: f.t, data: await blobInData(f.blob) }))) };
+    for (let k = 0; k < foto.length; k++) {
+      const f = foto[k];
+      pezzi.push((k ? "," : "") + JSON.stringify({ id: f.id, pianta: f.pianta, t: f.t, data: await blobInData(f.blob) }));
+    }
+    pezzi.push("]}");
     const nome = `rigo-copia-${new Date().toISOString().slice(0, 10)}.json`;
-    const file = new File([JSON.stringify(dati)], nome, { type: "application/json" });
+    const file = new File(pezzi, nome, { type: "application/json" });
+    pezzi.length = 0;
+    let fatta = true;
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: "Copia di Rigo" }).catch(() => {});
+      try { await navigator.share({ files: [file], title: "Copia di Rigo" }); }
+      catch (e) { if (e.name === "AbortError") fatta = false; else throw e; }
     } else {
       const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = nome;
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     }
-    toast("Copia pronta");
+    if (fatta) toast("Copia pronta");
   } catch (e) { toast("Non sono riuscito a fare la copia"); }
   b.textContent = "Salva una copia"; b.disabled = false;
 }
@@ -700,18 +722,47 @@ function campiPromemoria() {
   const lista = piante.map(p => ({ mapValue: { fields: { n: { stringValue: String(p.nome).slice(0, 40) }, l: { stringValue: giornoISO(p.last) }, e: { integerValue: String(p.e) }, i: { integerValue: String(p.i) } } } }));
   return { ora: { stringValue: imp.ora || "09:00" }, stagioni: { booleanValue: !!imp.stagioni }, agg: { timestampValue: new Date().toISOString() }, piante: { arrayValue: lista.length ? { values: lista } : {} } };
 }
-async function scriviPromemoria(extra) {
-  const fields = Object.assign(campiPromemoria(), extra || {});
+/* L'iscrizione alle notifiche di questo telefono. Si manda SEMPRE insieme ai dati: se il programma del mattino
+   ha tolto il documento (iscrizione scaduta), la scrittura dopo lo ricrea invece di essere rifiutata. */
+let subJSON = null;
+async function prendiSub() {
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub && "Notification" in window && Notification.permission === "granted") {
+    const r = await fetch(FS("config/pubblica"));
+    const chiave = r.ok ? (await r.json()).fields?.vapid?.stringValue : null;
+    if (chiave) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64InByte(chiave) });
+  }
+  subJSON = sub ? JSON.stringify(sub) : null;
+  return subJSON;
+}
+function promemoriaPerso() {
+  imp.promemoria = false; salvaImp(); subJSON = null;
+  toast("Il promemoria si è spento: riaccendilo dalle Impostazioni");
+}
+async function scriviPromemoria(extra, lasciaPartire) {
+  const s = subJSON || await prendiSub().catch(() => null);
+  if (!s) { promemoriaPerso(); return; }
+  const fields = Object.assign(campiPromemoria(), { sub: { stringValue: s } }, extra || {});
   const mask = Object.keys(fields).map(k => "updateMask.fieldPaths=" + k).join("&");
-  const r = await fetch(FS("telefoni/" + idTelefono()) + "?" + mask, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields }) });
+  const r = await fetch(FS("telefoni/" + idTelefono()) + "?" + mask, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields }), keepalive: !!lasciaPartire });
+  if (r.status === 400 || r.status === 403) { subJSON = null; throw new Error("rifiutata " + r.status); }
   if (!r.ok) throw new Error("scrittura " + r.status);
 }
-let tPromemoria;
+let tPromemoria = null;
 function aggiornaPromemoria(subito) {
   if (!imp.promemoria || !window.FIREBASE_PROGETTO) return;
   clearTimeout(tPromemoria);
-  tPromemoria = setTimeout(() => scriviPromemoria().catch(() => {}), subito ? 0 : 1500);
+  tPromemoria = setTimeout(() => { tPromemoria = null; scriviPromemoria().catch(e => console.warn("Promemoria:", e.message)); }, subito ? 0 : 1500);
 }
+// se l'app si chiude mentre una modifica aspetta, la si manda subito (keepalive: parte anche a pagina chiusa)
+function svuotaPromemoria() {
+  if (tPromemoria === null) return;
+  clearTimeout(tPromemoria); tPromemoria = null;
+  scriviPromemoria(null, true).catch(() => {});
+}
+addEventListener("pagehide", svuotaPromemoria);
+document.addEventListener("visibilitychange", () => { if (document.hidden) svuotaPromemoria(); });
 const b64InByte = s => { const p = "=".repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, c => c.charCodeAt(0)); };
 async function attivaPromemoria() {
   const installata = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
@@ -726,7 +777,8 @@ async function attivaPromemoria() {
     let sub = await reg.pushManager.getSubscription();
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64InByte(chiave) });
     imp.promemoria = true; salvaImp();
-    await scriviPromemoria({ sub: { stringValue: JSON.stringify(sub) } });
+    subJSON = JSON.stringify(sub);
+    await scriviPromemoria();
     render();
     return null;
   } catch (e) {
@@ -735,7 +787,8 @@ async function attivaPromemoria() {
   }
 }
 async function spegniPromemoria() {
-  imp.promemoria = false; salvaImp();
+  imp.promemoria = false; salvaImp(); subJSON = null;
+  clearTimeout(tPromemoria); tPromemoria = null;
   try { await fetch(FS("telefoni/" + idTelefono()), { method: "DELETE" }); } catch (e) {}
   try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) {}
   try { navigator.clearAppBadge && navigator.clearAppBadge(); } catch (e) {}
@@ -783,6 +836,8 @@ $("#open-settings").onclick = impostazioni;
     toast("Il telefono non lascia salvare i dati: forse è una finestra privata");
   }
   render();
+  // a ogni apertura si rinfresca il promemoria: se il documento era stato tolto, si ricrea
+  if (imp.promemoria && "serviceWorker" in navigator) aggiornaPromemoria(true);
 })();
 
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});

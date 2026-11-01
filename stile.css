@@ -367,3 +367,6 @@ body.vuota .fab{display:none}
 .ring.vuoto .bg{stroke:color-mix(in srgb,var(--warn) 30%,var(--surface-2))}
 .ring.vuoto text{fill:var(--warn);font-weight:700}
 @media (prefers-reduced-motion:reduce){.badge.due::after{animation:none;opacity:0}}
+.home-tip{position:relative;margin-top:16px;padding-right:44px;background:var(--water-soft)}
+.tip-x{position:absolute;right:8px;top:8px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:var(--ink-soft)}
+.tip-x svg{width:15px;height:15px}
