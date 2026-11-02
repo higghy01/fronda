@@ -467,3 +467,48 @@ html.aperto .tabbar{transform:translateY(110%)}
 /* La barra piccola ora ha il titolo della scheda aperta */
 .navbar{z-index:7}
 @media (prefers-reduced-motion:reduce){.em,.felici-ill,.rimbalza,.faccia *{animation:none!important}}
+
+/* Versione 6.2: Erika (e chi la aiuta) */
+.nome-ciao{color:var(--leaf);display:inline-block;animation:nomeEntra .7s var(--spring) both .15s}
+@keyframes nomeEntra{from{opacity:0;transform:translateY(8px) scale(.94)}}
+.vista.still .nome-ciao{animation:none}
+.chi-tag{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--t);color:#fff;font-style:normal;font-weight:700;font-size:12px;flex:none;box-shadow:0 2px 6px color-mix(in srgb,var(--t) 40%,transparent)}
+.coppia{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.coppia-t{font-size:14px;font-weight:600;color:var(--ink-soft);white-space:nowrap}
+.coppia-s{position:relative;display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border-radius:999px;padding:3px;min-width:0;flex:0 1 250px}
+.coppia-s button{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:6px;height:36px;border:0;background:none;border-radius:999px;font:inherit;font-size:14px;font-weight:600;color:var(--ink-soft);padding:0 8px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;transition:color .3s}
+.coppia-s button[aria-checked="true"]{color:var(--ink)}
+.coppia-s button:not([aria-checked="true"]) .chi-tag{filter:grayscale(.6);opacity:.65;transition:filter .3s,opacity .3s}
+.coppia-ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:999px;background:var(--surface);box-shadow:0 3px 10px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);transition:transform .45s var(--spring)}
+.coppia-s.due .coppia-ind{transform:translateX(100%)}
+.history .h-l{color:var(--ink);display:inline-flex;align-items:center;gap:6px}
+.history .chi-tag{width:18px;height:18px;font-size:10px;margin-left:4px}
+.group.nomi{margin-top:0}
+.campo-nome{display:flex;align-items:center;gap:12px;padding:0 16px;position:relative}
+.campo-nome+.campo-nome::before{content:"";position:absolute;left:50px;right:0;top:0;border-top:.5px solid var(--line)}
+.campo-nome .chi-tag{width:26px;height:26px;font-size:13px}
+.campo-nome input{flex:1;min-width:0;height:50px;border:0;background:none;font:inherit;font-size:17px;color:var(--ink);outline:none;user-select:text;-webkit-user-select:text}
+/* Benvenuto */
+.benv{text-align:center;padding-top:6px}
+.benv-ill{position:relative;height:150px;margin:4px auto 10px;max-width:280px}
+.benv-p{position:absolute;bottom:0;width:96px;height:120px;border-radius:26px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.12);animation:benvSale .8s var(--spring) both}
+.benv-p svg{width:100%;height:100%;display:block}
+.benv-p.p1{left:50%;margin-left:-48px;z-index:2;height:140px;animation-delay:.1s}
+.benv-p.p2{left:10px;transform:rotate(-9deg);--r:-9deg;animation-delay:.22s}
+.benv-p.p3{right:10px;transform:rotate(9deg);--r:9deg;animation-delay:.32s}
+@keyframes benvSale{from{opacity:0;transform:translateY(40px) rotate(var(--r,0deg)) scale(.8)}}
+.benv-c{position:absolute;font-style:normal;font-size:22px;z-index:3;animation:benvGalla 3s ease-in-out infinite}
+.benv-c.c1{left:30%;top:-4px;animation-delay:.2s}
+.benv-c.c2{right:22%;top:10px;animation-delay:1s}
+.benv-c.c3{left:12%;top:30px;animation-delay:1.8s}
+@keyframes benvGalla{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-8px) scale(1.12)}}
+.benv h3{font-size:30px;margin-top:6px;animation:nomeEntra .7s var(--spring) both .35s}
+.benv-s{color:var(--ink-soft);margin:6px auto 0;max-width:320px;line-height:1.45}
+.benv-l{list-style:none;padding:0;margin:16px 0 4px;text-align:left;background:var(--surface);border-radius:16px}
+.benv-l li{display:flex;align-items:center;gap:12px;padding:12px 14px;font-weight:600;animation:nomeEntra .6s var(--spring) both}
+.benv-l li:nth-child(1){animation-delay:.45s}.benv-l li:nth-child(2){animation-delay:.55s}.benv-l li:nth-child(3){animation-delay:.65s}
+.benv-l li+li{border-top:.5px solid var(--line)}
+.benv-l span{font-size:20px}
+.benv .field{text-align:left}
+.benv .field small{text-transform:none;letter-spacing:0;font-weight:500}
+@media (prefers-reduced-motion: reduce){.benv *,.nome-ciao{animation:none!important}}
