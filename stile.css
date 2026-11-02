@@ -408,7 +408,7 @@ img,svg{-webkit-user-drag:none}
 
 /* Testata di ogni scheda */
 header.top{padding-block:18px 4px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
-header.top .titolo{font-size:32px}
+header.top .titolo{font-size:32px;text-wrap:wrap}
 .top-b{display:flex;gap:10px}
 .round-btn.piu{background:linear-gradient(180deg,color-mix(in srgb,var(--leaf) 85%,#fff),var(--leaf));color:#fff;box-shadow:0 6px 16px color-mix(in srgb,var(--leaf) 35%,transparent)}
 .round-btn.piu svg{width:20px;height:20px;transition:transform .5s var(--spring)}
