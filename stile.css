@@ -512,3 +512,13 @@ html.aperto .tabbar{transform:translateY(110%)}
 .benv .field{text-align:left}
 .benv .field small{text-transform:none;letter-spacing:0;font-weight:500}
 @media (prefers-reduced-motion: reduce){.benv *,.nome-ciao{animation:none!important}}
+
+/* Versione 6.4: scorrimento più fluido (stesse regole di NDSZ v71, con lo stile di Rigo)
+   - le schede rimbalzano in cima e in fondo come nelle app dell'iPhone (solo in verticale)
+   - il foglio dal basso non rimbalza in cima: tirando giù si muove il foglio
+   - vetro più leggero: la barra in alto sfoca solo quando si vede */
+.vista{overscroll-behavior-x:none;overscroll-behavior-y:contain;touch-action:pan-y}
+.sheet{overscroll-behavior-y:none}
+.navbar{-webkit-backdrop-filter:none;backdrop-filter:none}
+.navbar.on{-webkit-backdrop-filter:saturate(160%) blur(14px);backdrop-filter:saturate(160%) blur(14px)}
+.tabbar{-webkit-backdrop-filter:saturate(160%) blur(16px);backdrop-filter:saturate(160%) blur(16px)}
