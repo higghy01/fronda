@@ -280,7 +280,8 @@ function vai(tab) {
 /* Barra piccola in vetro: compare quando il titolo grande della scheda è scorso via */
 function barraTitolo() {
   const v = $("#v-" + tabAttiva), h = v.querySelector(".titolo");
-  $("#nav-t").textContent = h ? h.textContent.replace(/[^\p{L}\s']/gu, "").trim() : "";
+  // il <br> del saluto diventa uno spazio: "Buongiorno, Erika" (le emoji restano fuori)
+  $("#nav-t").textContent = h ? h.innerHTML.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]*>/g, "").replace(/&[a-z#0-9]+;/gi, " ").replace(/[^\p{L}\s',]/gu, "").replace(/\s+/g, " ").trim().replace(/,$/, "") : "";
   $("#navbar").classList.toggle("on", v.scrollTop > 56);
 }
 
@@ -868,7 +869,7 @@ function impostazioni() {
       <input type="file" id="b-file" accept="application/json,.json" hidden>
       <div id="b-conf"></div>
     </div>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.2 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.2.1 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `);
   const nomeCambiato = (id, k) => { const el = $(id); el.onchange = () => {
     imp[k] = pulisciNome(el.value); el.value = imp[k]; if (!nomeAiuto()) imp.chi = "io";
