@@ -74,10 +74,12 @@ function pulisciPianta(p) {
 }
 
 const IMP_KEY = "fronda-impostazioni";
-let imp = { stagioni: true, promemoria: false, ora: "09:00", io: "Erika", aiuto: "", chi: "io", benvenuto: false };
+let imp = { stagioni: true, promemoria: false, ora: "09:00", io: "", aiuto: "", chi: "io", benvenuto: false };
 try { Object.assign(imp, JSON.parse(localStorage.getItem(IMP_KEY)) || {}); } catch (e) {}
 const salvaImp = () => { try { localStorage.setItem(IMP_KEY, JSON.stringify(imp)); } catch (e) {} };
-/* Chi cura le piante: lei (di solito Erika) e, se vuole, chi la aiuta. Ogni annaffiatura ricorda chi l'ha fatta. */
+// 6.3: niente più nome già scritto (Sasha 02/11: "più generico"); il vecchio "Erika" predefinito si toglie una volta
+if (!imp.generico) { if (imp.io === "Erika") imp.io = ""; imp.generico = true; salvaImp(); }
+/* Chi cura le piante: il proprio nome (facoltativo) e, se si vuole, chi aiuta. Ogni annaffiatura ricorda chi l'ha fatta. */
 const pulisciNome = v => String(v || "").replace(/\s+/g, " ").trim().slice(0, 24);
 const nomeIo = () => pulisciNome(imp.io);
 const nomeAiuto = () => pulisciNome(imp.aiuto);
@@ -280,7 +282,7 @@ function vai(tab) {
 /* Barra piccola in vetro: compare quando il titolo grande della scheda è scorso via */
 function barraTitolo() {
   const v = $("#v-" + tabAttiva), h = v.querySelector(".titolo");
-  // il <br> del saluto diventa uno spazio: "Buongiorno, Erika" (le emoji restano fuori)
+  // il <br> del saluto diventa uno spazio: "Buongiorno, Anna" (le emoji restano fuori)
   $("#nav-t").textContent = h ? h.innerHTML.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]*>/g, "").replace(/&[a-z#0-9]+;/gi, " ").replace(/[^\p{L}\s',]/gu, "").replace(/\s+/g, " ").trim().replace(/,$/, "") : "";
   $("#navbar").classList.toggle("on", v.scrollTop > 56);
 }
@@ -443,7 +445,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") { if (viewer
 })();
 
 /* ---------- Benvenuto (la prima volta) ----------
-   Rigo è soprattutto per Erika: la saluta per nome e chiede chi la aiuta con le piante. */
+   Saluto generico; il nome e chi aiuta sono facoltativi. */
 function benvenuto() {
   if (foglioAperto) return;
   imp.benvenuto = true; salvaImp();
@@ -456,23 +458,23 @@ function benvenuto() {
         <span class="benv-p p3">${art(SPECIE.sansevieria.art, SPECIE.sansevieria.c, 5)}</span>
         <i class="benv-c c1">💚</i><i class="benv-c c2">💧</i><i class="benv-c c3">✨</i>
       </div>
-      <h3>${nome ? `Ciao ${esc(nome)}!` : "Ciao!"}</h3>
-      <p class="benv-s">Benvenuta in <b>Rigo</b>, che in latino vuol dire <i>“io annaffio”</i>. Da oggi le tue piante hanno qualcuno che si ricorda di loro.</p>
+      <h3>Ciao! 🌿</h3>
+      <p class="benv-s">Questo è <b>Rigo</b>, che in latino vuol dire <i>“io annaffio”</i>. Da oggi le tue piante hanno qualcuno che si ricorda di loro.</p>
       <ul class="benv-l">
         <li><span>💧</span>Ti dice chi ha sete, ogni mattina</li>
         <li><span>📸</span>Riconosce le piante da una foto</li>
         <li><span>🩺</span>Ti aiuta se una pianta non sta bene</li>
       </ul>
-      <div class="field"><label for="bv-io">Il tuo nome</label><input id="bv-io" value="${esc(nome)}" maxlength="24" autocomplete="given-name" enterkeyhint="next"></div>
-      <div class="field"><label for="bv-aiuto">Chi ti aiuta con le piante? <small>(facoltativo)</small></label><input id="bv-aiuto" value="${esc(nomeAiuto())}" placeholder="Il suo nome" maxlength="24" autocomplete="off" enterkeyhint="done"></div>
-      <p class="note" style="margin-top:4px">Se lo scrivi, potrete segnare chi di voi due ha annaffiato.</p>
+      <div class="field"><label for="bv-io">Il tuo nome <small>(facoltativo)</small></label><input id="bv-io" value="${esc(nome)}" placeholder="Come ti chiami?" maxlength="24" autocomplete="given-name" enterkeyhint="next"></div>
+      <div class="field"><label for="bv-aiuto">Qualcuno ti aiuta? <small>(facoltativo)</small></label><input id="bv-aiuto" value="${esc(nomeAiuto())}" placeholder="Il suo nome" maxlength="24" autocomplete="off" enterkeyhint="done"></div>
+      <p class="note" style="margin-top:4px">Con due nomi potete segnare chi ha annaffiato. Si cambiano quando vuoi nelle Impostazioni.</p>
       <button class="btn water" id="bv-ok">Iniziamo</button>
     </div>
-  `, "Benvenuta in Rigo");
+  `, "Benvenuto in Rigo");
   $("#bv-ok").onclick = () => {
     imp.io = pulisciNome($("#bv-io").value); imp.aiuto = pulisciNome($("#bv-aiuto").value); if (!imp.aiuto) imp.chi = "io";
     salvaImp(); chiudiFoglio(); tocco(); morbido(render); aggiornaPromemoria();
-    toast(nomeIo() && nomeAiuto() ? `Benvenuti, ${nomeIo()} e ${nomeAiuto()}!` : nomeIo() ? `Benvenuta, ${nomeIo()}!` : "Benvenuta!");
+    toast(piante.length ? "Fatto!" : "Pronti! Aggiungi la prima pianta");
   };
 }
 
@@ -869,7 +871,7 @@ function impostazioni() {
       <input type="file" id="b-file" accept="application/json,.json" hidden>
       <div id="b-conf"></div>
     </div>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.2.1 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.3 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `);
   const nomeCambiato = (id, k) => { const el = $(id); el.onchange = () => {
     imp[k] = pulisciNome(el.value); el.value = imp[k]; if (!nomeAiuto()) imp.chi = "io";
