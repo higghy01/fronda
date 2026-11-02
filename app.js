@@ -67,15 +67,22 @@ function pulisciPianta(p) {
     stanza: String(p.stanza || "").slice(0, 30), e: giorni(p.e, s.e), i: giorni(p.i, s.i), note: String(p.note || "").slice(0, 400),
     creata: +p.creata || now(), last: +p.last || now(),
     storia: Array.isArray(p.storia) ? p.storia.map(Number).filter(Boolean).slice(0, 60) : [],
+    da: p.da && typeof p.da === "object" && !Array.isArray(p.da) ? Object.fromEntries(Object.entries(p.da).filter(([k, v]) => /^\d{1,15}$/.test(k) && typeof v === "string").slice(0, 60).map(([k, v]) => [k, pulisciNome(v)])) : {},
     thumb: typeof p.thumb === "string" && p.thumb.startsWith("data:image/") ? p.thumb : null,
     coverId: p.coverId ? String(p.coverId) : null
   };
 }
 
 const IMP_KEY = "fronda-impostazioni";
-let imp = { stagioni: true, promemoria: false, ora: "09:00" };
+let imp = { stagioni: true, promemoria: false, ora: "09:00", io: "Erika", aiuto: "", chi: "io", benvenuto: false };
 try { Object.assign(imp, JSON.parse(localStorage.getItem(IMP_KEY)) || {}); } catch (e) {}
 const salvaImp = () => { try { localStorage.setItem(IMP_KEY, JSON.stringify(imp)); } catch (e) {} };
+/* Chi cura le piante: lei (di solito Erika) e, se vuole, chi la aiuta. Ogni annaffiatura ricorda chi l'ha fatta. */
+const pulisciNome = v => String(v || "").replace(/\s+/g, " ").trim().slice(0, 24);
+const nomeIo = () => pulisciNome(imp.io);
+const nomeAiuto = () => pulisciNome(imp.aiuto);
+const chiAnnaffia = () => imp.chi === "aiuto" && nomeAiuto() ? nomeAiuto() : nomeIo();
+const iniziale = n => (n || "?").trim().charAt(0).toUpperCase();
 
 let piante = [];
 let filtro = "";      // stanza scelta
@@ -133,10 +140,23 @@ const testa = (titolo, extra) => `<header class="top"><div><div class="date">${e
   <div class="top-b">${extra || ""}<button class="round-btn piu" data-add aria-label="Aggiungi una pianta">${ICO_PIU}</button></div></header>`;
 const vuoto = () => `<section class="empty">
       <div class="ill rimbalza">${art("monstera", SPECIE.monstera.c, 3)}</div>
-      <h2>Iniziamo dalla prima pianta</h2>
+      <h2>${nomeIo() && nomeAiuto() ? `${esc(nomeIo())} e ${esc(nomeAiuto())}, iniziamo dalla prima pianta` : nomeIo() ? `${esc(nomeIo())}, iniziamo dalla prima pianta` : "Iniziamo dalla prima pianta"}</h2>
       <p>Fai una foto, scegli il tipo e Rigo ti dice quando annaffiarla.</p>
       <button class="btn water" data-add style="max-width:280px">Aggiungi una pianta</button>
     </section>`;
+/* "Chi annaffia?": se c'è anche chi la aiuta, due bollini in alto. Il prescelto firma le annaffiature. */
+const TINTE_CHI = ["#2A7FD4", "#C2456A"];
+const tintaChi = n => TINTE_CHI[n === nomeAiuto() && n !== nomeIo() ? 1 : 0];
+const coppia = () => !nomeAiuto() ? "" : `<div class="coppia" role="radiogroup" aria-label="Chi annaffia?"><span class="coppia-t">Chi annaffia?</span>
+  <div class="coppia-s${imp.chi === "aiuto" ? " due" : ""}"><i class="coppia-ind" aria-hidden="true"></i>
+  ${[["io", nomeIo() || "Io"], ["aiuto", nomeAiuto()]].map(([k, n], i) => `<button role="radio" aria-checked="${(imp.chi === "aiuto") === (k === "aiuto")}" data-chi="${k}"><i class="chi-tag" style="--t:${TINTE_CHI[i]}">${esc(iniziale(n))}</i>${esc(n)}</button>`).join("")}</div></div>`;
+function scegliChi(k) {
+  if (imp.chi === k) return;
+  imp.chi = k; salvaImp(); tocco();
+  $$(".coppia-s").forEach(s => { s.classList.toggle("due", k === "aiuto"); s.querySelectorAll("[data-chi]").forEach(b => b.setAttribute("aria-checked", b.dataset.chi === k)); });
+  const b = $(`.coppia-s [data-chi="${k}"] .chi-tag`);
+  if (b && b.animate && !pocoMoto()) b.animate([{ transform: "scale(1)" }, { transform: "scale(1.35) rotate(-8deg)" }, { transform: "scale(1)" }], { duration: 420, easing: "cubic-bezier(.34,1.56,.64,1)" });
+}
 let sete = -1, daFesteggiare = false;   // la festa parte solo se si arriva a zero annaffiando (non eliminando, modificando o ripristinando)
 
 function render() {
@@ -144,9 +164,10 @@ function render() {
   [vo, vp].forEach(v => v.classList.toggle("still", !primaVolta));
   primaVolta = false;
   const [ciao, em] = saluto();
+  const ciaoNome = `${ciao}${nomeIo() ? `,<br><span class="nome-ciao">${esc(nomeIo())}</span>` : ""} <span class="em">${em}</span>`;
 
   if (!piante.length) {
-    vo.innerHTML = testa(`${ciao} <span class="em">${em}</span>`) + consiglioHome() + vuoto();
+    vo.innerHTML = testa(ciaoNome) + coppia() + consiglioHome() + vuoto();
     vp.innerHTML = testa("Le tue piante") + vuoto();
     document.body.classList.add("vuota");
     contatore(0); sete = 0;
@@ -163,7 +184,7 @@ function render() {
   const elencoStanze = stanze();
   if (filtro && !elencoStanze.includes(filtro)) filtro = "";
 
-  vo.innerHTML = `${testa(`${ciao} <span class="em">${em}</span>`)}${consiglioHome()}
+  vo.innerHTML = `${testa(ciaoNome)}${coppia()}${consiglioHome()}
   <section class="today" data-k="today">
     ${ring(1 - oggi.length / tot, `${tot - oggi.length}/${tot}`, true).replace('class="ring', 'class="ring gauge')}
     <div><b>${oggi.length ? `${oggi.length === 1 ? "Una pianta ha" : oggi.length + " piante hanno"} sete oggi` : "Tutte a posto oggi"}</b>
@@ -292,6 +313,8 @@ function griglia(ordinate) {
 }
 
 $("#app").addEventListener("click", e => {
+  const c = e.target.closest("[data-chi]");
+  if (c) { scegliChi(c.dataset.chi); return; }
   const w = e.target.closest("[data-water]");
   if (w) { const p = piante.find(x => x.id === w.dataset.water); const row = w.closest(".trow"); if (!p || row.classList.contains("gone")) return; tocco(); row.classList.add("gone"); setTimeout(() => annaffia(p), 280); return; }
   const o = e.target.closest("[data-open]");
@@ -335,23 +358,31 @@ const tocco = (() => {
 
 /* ---------- Annaffiare ---------- */
 function annaffia(p, dalla) {
-  const prima = { last: p.last, storia: [...p.storia] };
-  p.last = now();
-  p.storia = [p.last, ...p.storia].slice(0, 60);
+  const prima = { last: p.last, storia: [...p.storia], da: { ...(p.da || {}) } };
+  segnaAcqua(p);
   salva(p);
   daFesteggiare = true;
   morbido(render);
-  toast(`${p.nome} ringrazia`, () => { Object.assign(p, prima); salva(p); morbido(render); if (schedaAperta === p.id) scheda(p.id, true); });
+  const chi = chiAnnaffia();
+  toast(chi ? `${p.nome} ringrazia ${chi}` : `${p.nome} ringrazia`, () => { Object.assign(p, prima); salva(p); morbido(render); if (schedaAperta === p.id) scheda(p.id, true); });
+}
+// segna l'acqua di adesso e chi l'ha data (si tiene il nome solo per le annaffiature ancora nello storico)
+function segnaAcqua(p) {
+  p.last = now();
+  p.storia = [p.last, ...p.storia].slice(0, 60);
+  const da = Object.assign({}, p.da), chi = chiAnnaffia();
+  if (chi) da[p.last] = chi;
+  p.da = Object.fromEntries(Object.entries(da).filter(([k]) => p.storia.includes(+k)));
 }
 function annaffiaTutte(lista) {
-  const prima = lista.map(p => ({ p, last: p.last, storia: [...p.storia] }));
+  const prima = lista.map(p => ({ p, last: p.last, storia: [...p.storia], da: { ...(p.da || {}) } }));
   tocco();
   $$(".trow").forEach((r, i) => setTimeout(() => r.classList.add("gone"), i * 50));
   setTimeout(() => {
-    lista.forEach(p => { p.last = now(); p.storia = [p.last, ...p.storia].slice(0, 60); salva(p); });
+    lista.forEach(p => { segnaAcqua(p); salva(p); });
     daFesteggiare = true;
     morbido(render);
-    toast(`${lista.length} piante annaffiate`, () => { prima.forEach(x => { x.p.last = x.last; x.p.storia = x.storia; salva(x.p); }); morbido(render); });
+    toast(`${lista.length} piante annaffiate`, () => { prima.forEach(x => { x.p.last = x.last; x.p.storia = x.storia; x.p.da = x.da; salva(x.p); }); morbido(render); });
   }, 280 + lista.length * 50);
 }
 
@@ -410,7 +441,43 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") { if (viewer
   });
 })();
 
+/* ---------- Benvenuto (la prima volta) ----------
+   Rigo è soprattutto per Erika: la saluta per nome e chiede chi la aiuta con le piante. */
+function benvenuto() {
+  if (foglioAperto) return;
+  imp.benvenuto = true; salvaImp();
+  const nome = nomeIo();
+  apri(`
+    <div class="benv">
+      <div class="benv-ill" aria-hidden="true">
+        <span class="benv-p p1">${art("monstera", SPECIE.monstera.c, 3)}</span>
+        <span class="benv-p p2">${art(SPECIE.pothos.art, SPECIE.pothos.c, 7)}</span>
+        <span class="benv-p p3">${art(SPECIE.sansevieria.art, SPECIE.sansevieria.c, 5)}</span>
+        <i class="benv-c c1">💚</i><i class="benv-c c2">💧</i><i class="benv-c c3">✨</i>
+      </div>
+      <h3>${nome ? `Ciao ${esc(nome)}!` : "Ciao!"}</h3>
+      <p class="benv-s">Benvenuta in <b>Rigo</b>, che in latino vuol dire <i>“io annaffio”</i>. Da oggi le tue piante hanno qualcuno che si ricorda di loro.</p>
+      <ul class="benv-l">
+        <li><span>💧</span>Ti dice chi ha sete, ogni mattina</li>
+        <li><span>📸</span>Riconosce le piante da una foto</li>
+        <li><span>🩺</span>Ti aiuta se una pianta non sta bene</li>
+      </ul>
+      <div class="field"><label for="bv-io">Il tuo nome</label><input id="bv-io" value="${esc(nome)}" maxlength="24" autocomplete="given-name" enterkeyhint="next"></div>
+      <div class="field"><label for="bv-aiuto">Chi ti aiuta con le piante? <small>(facoltativo)</small></label><input id="bv-aiuto" value="${esc(nomeAiuto())}" placeholder="Il suo nome" maxlength="24" autocomplete="off" enterkeyhint="done"></div>
+      <p class="note" style="margin-top:4px">Se lo scrivi, potrete segnare chi di voi due ha annaffiato.</p>
+      <button class="btn water" id="bv-ok">Iniziamo</button>
+    </div>
+  `, "Benvenuta in Rigo");
+  $("#bv-ok").onclick = () => {
+    imp.io = pulisciNome($("#bv-io").value); imp.aiuto = pulisciNome($("#bv-aiuto").value); if (!imp.aiuto) imp.chi = "io";
+    salvaImp(); chiudiFoglio(); tocco(); morbido(render); aggiornaPromemoria();
+    toast(nomeIo() && nomeAiuto() ? `Benvenuti, ${nomeIo()} e ${nomeAiuto()}!` : nomeIo() ? `Benvenuta, ${nomeIo()}!` : "Benvenuta!");
+  };
+}
+
 /* ---------- Scheda della pianta ---------- */
+const storico = p => p.storia.slice(0, 6).map((t, i) => { const chi = nomeAiuto() && p.da && p.da[t];
+  return `<div><span class="h-l">${i === 0 ? "Ultima" : "Annaffiata"}${chi ? ` <i class="chi-tag" style="--t:${tintaChi(chi)}">${esc(iniziale(chi))}</i>${esc(chi)}` : ""}</span><span>${fmt(t)}</span></div>`; }).join("") || `<div>Ancora nessuna<span></span></div>`;
 async function scheda(id, senzaAnim) {
   const p = piante.find(x => x.id === id);
   if (!p) return;
@@ -435,7 +502,7 @@ async function scheda(id, senzaAnim) {
     <div class="album" id="album"><label class="add" for="foto-in">${ICO.cam}Aggiungi<br>foto</label></div>
     <input type="file" id="foto-in" accept="image/*" hidden>
     <div class="block-h">Annaffiature</div>
-    <div class="history">${p.storia.slice(0, 6).map((t, i) => `<div>${i === 0 ? "Ultima" : "Annaffiata"}<span>${fmt(t)}</span></div>`).join("") || `<div>Ancora nessuna<span></span></div>`}</div>
+    <div class="history" id="storico">${storico(p)}</div>
     <button class="btn ghost" id="modifica" style="margin-top:22px">Modifica pianta</button>
   `, "Scheda di " + p.nome);
   $("#sheet [data-close]").onclick = chiudiFoglio;
@@ -514,6 +581,7 @@ function animaAcqua(p, e) {
     $("#wb-t").textContent = "Prossima acqua " + quando(ogni(p));
     $("#wb-s").textContent = "Annaffiata adesso";
     annaffia(p);
+    const st = $("#storico"); if (st) { st.innerHTML = storico(p); const r = st.firstElementChild; if (r && r.animate && !pocoMoto()) r.animate([{ opacity: 0, transform: "translateY(-6px)" }, { opacity: 1, transform: "none" }], { duration: 450, easing: MOLLA }); }
     b.disabled = false;
   }, 650);
 }
@@ -780,6 +848,12 @@ function impostazioni() {
   $("#v-imp").innerHTML = (`
     <header class="top"><div><div class="date">${esc(oggiData())}</div><h1 class="titolo">Impostazioni</h1></div></header>
     ${installata ? "" : `<div class="tip" style="margin-top:14px"><b>Usala come un'app</b>In Safari tocca Condividi, poi "Aggiungi alla schermata Home". Così si apre a tutto schermo, anche senza rete.</div>`}
+    <div class="block-h">Chi cura le piante</div>
+    <div class="group nomi">
+    <label class="campo-nome"><span class="chi-tag" style="--t:${TINTE_CHI[0]}">${esc(iniziale(nomeIo() || "Tu"))}</span><input id="n-io" value="${esc(nomeIo())}" placeholder="Il tuo nome" maxlength="24" autocomplete="given-name" aria-label="Il tuo nome"></label>
+    <label class="campo-nome"><span class="chi-tag" style="--t:${TINTE_CHI[1]}">${nomeAiuto() ? esc(iniziale(nomeAiuto())) : "+"}</span><input id="n-aiuto" value="${esc(nomeAiuto())}" placeholder="Chi ti aiuta (facoltativo)" maxlength="24" autocomplete="off" aria-label="Chi ti aiuta"></label>
+    </div>
+    <p class="note" style="margin-top:6px">Con due nomi, nella scheda Oggi scegli chi annaffia: ogni annaffiatura ricorda chi l'ha fatta.</p>
     <div class="group">
     <div class="switch"><div><b>Ritmo stagionale</b><small>Da ottobre a marzo usa i giorni "d'inverno", perché le piante bevono meno</small></div><input type="checkbox" id="sw-stag" ${imp.stagioni ? "checked" : ""} aria-label="Ritmo stagionale"></div>
     <div class="switch"><div><b>Promemoria del mattino</b><small>${window.FIREBASE_PROGETTO ? "Un avviso sul telefono, solo nei giorni in cui una pianta ha sete" : "In arrivo: un avviso al mattino quando una pianta ha sete"}</small></div><input type="checkbox" id="sw-prom" ${imp.promemoria ? "checked" : ""} ${window.FIREBASE_PROGETTO ? "" : "disabled"} aria-label="Promemoria del mattino"></div>
@@ -794,8 +868,13 @@ function impostazioni() {
       <input type="file" id="b-file" accept="application/json,.json" hidden>
       <div id="b-conf"></div>
     </div>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.1 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.2 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `);
+  const nomeCambiato = (id, k) => { const el = $(id); el.onchange = () => {
+    imp[k] = pulisciNome(el.value); el.value = imp[k]; if (!nomeAiuto()) imp.chi = "io";
+    salvaImp(); render(); impostazioni(); aggiornaPromemoria(); toast(imp[k] ? "Nome salvato" : "Nome tolto");
+  }; };
+  nomeCambiato("#n-io", "io"); nomeCambiato("#n-aiuto", "aiuto");
   $("#sw-stag").onchange = e => { imp.stagioni = e.target.checked; salvaImp(); render(); aggiornaPromemoria(); };
   $("#sw-prom").onchange = async e => {
     const sw = e.target; sw.disabled = true;
@@ -861,7 +940,8 @@ function chiediRipristino(file) {
         }
         await DB.sostituisci(nuove, foto);
         // il promemoria resta quello di questo telefono: l'iscrizione agli avvisi non viaggia con la copia
-        if (d.impostazioni) { imp = Object.assign({}, imp, { stagioni: d.impostazioni.stagioni !== false, ora: d.impostazioni.ora || imp.ora }); salvaImp(); }
+        if (d.impostazioni) { imp = Object.assign({}, imp, { stagioni: d.impostazioni.stagioni !== false, ora: d.impostazioni.ora || imp.ora,
+          ...(typeof d.impostazioni.io === "string" ? { io: pulisciNome(d.impostazioni.io), aiuto: pulisciNome(d.impostazioni.aiuto), chi: d.impostazioni.chi === "aiuto" ? "aiuto" : "io" } : {}) }); salvaImp(); }
         piante = await DB.all("piante"); liberaFoto(); aggiornaPromemoria();
         chiudiFoglio(); render(); vai("oggi"); toast("Copia ripristinata");
       } catch (er) {
@@ -890,7 +970,7 @@ function idTelefono() {
 const giornoISO = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 function campiPromemoria() {
   const lista = piante.map(p => ({ mapValue: { fields: { n: { stringValue: String(p.nome).slice(0, 40) }, l: { stringValue: giornoISO(p.last) }, e: { integerValue: String(p.e) }, i: { integerValue: String(p.i) } } } }));
-  return { ora: { stringValue: imp.ora || "09:00" }, stagioni: { booleanValue: !!imp.stagioni }, agg: { timestampValue: new Date().toISOString() }, piante: { arrayValue: lista.length ? { values: lista } : {} } };
+  return { nome: { stringValue: nomeIo() }, ora: { stringValue: imp.ora || "09:00" }, stagioni: { booleanValue: !!imp.stagioni }, agg: { timestampValue: new Date().toISOString() }, piante: { arrayValue: lista.length ? { values: lista } : {} } };
 }
 /* L'iscrizione alle notifiche di questo telefono. Si manda SEMPRE insieme ai dati: se il programma del mattino
    ha tolto il documento (iscrizione scaduta), la scrittura dopo lo ricrea invece di essere rifiutata. */
@@ -1004,6 +1084,7 @@ $$(".vista").forEach(v => {
     toast("Il telefono non lascia salvare i dati: forse è una finestra privata");
   }
   render();
+  if (!imp.benvenuto) setTimeout(benvenuto, 650);
   // a ogni apertura si rinfresca il promemoria: se il documento era stato tolto, si ricrea
   if (imp.promemoria && "serviceWorker" in navigator) aggiornaPromemoria(true);
 })();
