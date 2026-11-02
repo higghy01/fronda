@@ -280,11 +280,16 @@ function vai(tab) {
   tocco();
 }
 /* Barra piccola in vetro: compare quando il titolo grande della scheda è scorso via */
+// scorrendo si fa il minimo: il testo della barra si calcola una volta per titolo (quando la scheda viene ridisegnata)
+let titoloVisto = null, navOn = null;
 function barraTitolo() {
   const v = $("#v-" + tabAttiva), h = v.querySelector(".titolo");
+  const on = v.scrollTop > 56;
+  if (on !== navOn) { navOn = on; $("#navbar").classList.toggle("on", on); }
+  if (h === titoloVisto) return;
+  titoloVisto = h;
   // il <br> del saluto diventa uno spazio: "Buongiorno, Anna" (le emoji restano fuori)
   $("#nav-t").textContent = h ? h.innerHTML.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]*>/g, "").replace(/&[a-z#0-9]+;/gi, " ").replace(/[^\p{L}\s',]/gu, "").replace(/\s+/g, " ").trim().replace(/,$/, "") : "";
-  $("#navbar").classList.toggle("on", v.scrollTop > 56);
 }
 
 /* Le piante disegnate ondeggiano solo quando si vedono: con 50 piante il telefono resta fluido */
@@ -421,7 +426,9 @@ window.addEventListener("popstate", () => {
 $("#scrim").onclick = chiudiFoglio;
 document.addEventListener("keydown", e => { if (e.key === "Escape") { if (viewerAperto || foglioAperto) history.back(); } });
 
-/* Trascinare giù per chiudere */
+/* Trascinare giù per chiudere.
+   Ascolti tutti passivi (lo scorrimento non aspetta mai il codice): il foglio non rimbalza in cima
+   (overscroll-behavior-y: none nel CSS), così tirando giù dall'alto si muove il foglio e non il contenuto. */
 (() => {
   const sh = $("#sheet"), root = document.documentElement; let y0 = null, dy = 0, t0 = 0, vel = 0, yPrima = 0;
   sh.addEventListener("touchstart", e => { if (sh.scrollTop <= 0 && !e.target.closest("input,textarea,select,.sp-list")) { y0 = yPrima = e.touches[0].clientY; dy = 0; vel = 0; t0 = e.timeStamp; } else y0 = null; }, { passive: true });
@@ -431,11 +438,13 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") { if (viewer
     dy = y - y0;
     const dt = Math.max(1, e.timeStamp - t0); vel = (y - yPrima) / dt; yPrima = y; t0 = e.timeStamp;
     if (dy > 0) {
-      e.preventDefault(); sh.classList.add("drag"); root.classList.add("trascina");
+      sh.classList.add("drag"); root.classList.add("trascina");
       sh.style.transform = `translateY(${dy}px)`;
       root.style.setProperty("--p", Math.max(0, 1 - dy / Math.max(300, sh.offsetHeight)).toFixed(3));
+    } else if (sh.classList.contains("drag")) {
+      sh.classList.remove("drag"); root.classList.remove("trascina"); sh.style.transform = ""; root.style.removeProperty("--p");
     }
-  }, { passive: false });
+  }, { passive: true });
   sh.addEventListener("touchend", () => {
     if (y0 === null) return;
     sh.classList.remove("drag"); root.classList.remove("trascina"); sh.style.transform = ""; root.style.removeProperty("--p");
@@ -871,7 +880,7 @@ function impostazioni() {
       <input type="file" id="b-file" accept="application/json,.json" hidden>
       <div id="b-conf"></div>
     </div>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.3 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.4 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `);
   const nomeCambiato = (id, k) => { const el = $(id); el.onchange = () => {
     imp[k] = pulisciNome(el.value); el.value = imp[k]; if (!nomeAiuto()) imp.chi = "io";
