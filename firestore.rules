@@ -11,13 +11,15 @@ service cloud.firestore {
       function valido() {
         let d = request.resource.data;
         return id.size() >= 20 && id.size() <= 40
-          && d.keys().hasOnly(['sub', 'ora', 'piante', 'stagioni', 'agg', 'inviato'])
+          && d.keys().hasOnly(['sub', 'ora', 'piante', 'stagioni', 'agg', 'inviato', 'nome'])
           && d.sub is string && d.sub.size() < 2000
           // solo iscrizioni vere dei servizi di notifica di Apple, Google, Mozilla e Microsoft
           && d.sub.matches('\\{"endpoint":"https://(web\\.push\\.apple\\.com|fcm\\.googleapis\\.com|updates\\.push\\.services\\.mozilla\\.com|[a-z0-9-]+\\.notify\\.windows\\.com)/[^"]+".*')
           && d.ora is string && d.ora.size() <= 5
           && d.piante is list && d.piante.size() <= 300
-          && d.stagioni is bool;
+          && d.stagioni is bool
+          // il nome di chi riceve l'avviso (facoltativo, corto)
+          && d.get('nome', '') is string && d.get('nome', '').size() <= 30;
       }
       function inviatoUguale() {
         return resource == null
