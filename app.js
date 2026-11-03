@@ -408,9 +408,11 @@ function apri(html, label) {
   requestAnimationFrame(() => sh.classList.add("on"));
 }
 /* Con un foglio aperto la pagina dietro si rimpicciolisce un po', come le schede dell'iPhone */
+const COLORI_BARRA = $$('meta[name="theme-color"]').map(m => [m, m.content]);
 function sfondo(on) {
-  const a = $("#app"), r = document.documentElement;
-  r.classList.toggle("aperto", on);
+  document.documentElement.classList.toggle("aperto", on);
+  // la barra in alto (ora, batteria) diventa nera come lo sfondo dietro il foglio, poi torna come prima
+  COLORI_BARRA.forEach(([m, c]) => m.setAttribute("content", on ? "#000000" : c));
 }
 function chiudiFoglio() { if (foglioAperto) history.back(); }
 function _chiudiFoglio() {
@@ -571,7 +573,9 @@ function apriFoto(p, f) {
   };
 }
 
+const giaOggi = p => p.storia.length > 0 && giorniDa(p.storia[0]) === 0;
 function animaAcqua(p, e) {
+  if (giaOggi(p)) { tocco(); toast(`${p.nome} ha già bevuto oggi`); return; }
   const b = e.currentTarget, r = b.getBoundingClientRect(), rp = document.createElement("span"), sz = Math.max(r.width, r.height) * 2;
   rp.className = "ripple"; rp.style.cssText = `width:${sz}px;height:${sz}px;left:${e.clientX - r.left - sz / 2}px;top:${e.clientY - r.top - sz / 2}px`;
   b.appendChild(rp); setTimeout(() => rp.remove(), 700); tocco();
@@ -588,11 +592,14 @@ function animaAcqua(p, e) {
   setTimeout(() => {
     const sp = document.createElement("div"); sp.className = "splash"; sp.style.left = cx + "px"; sp.style.top = cy + "px";
     wb.appendChild(sp); setTimeout(() => sp.remove(), 800);
+    rg.classList.remove("vuoto");
     rg.querySelector(".fg").style.strokeDashoffset = "0";
     rg.querySelector("text").textContent = ogni(p) + "g";
     $("#wb-t").textContent = "Prossima acqua " + quando(ogni(p));
     $("#wb-s").textContent = "Annaffiata adesso";
     annaffia(p);
+    const hero = $("#hero"), vecchio = hero && !p.thumb ? hero.querySelector("svg.art") : null;
+    if (vecchio) vecchio.outerHTML = pic(p).replace("xMidYMid slice", "xMidYMax slice");
     const st = $("#storico"); if (st) { st.innerHTML = storico(p); const r = st.firstElementChild; if (r && r.animate && !pocoMoto()) r.animate([{ opacity: 0, transform: "translateY(-6px)" }, { opacity: 1, transform: "none" }], { duration: 450, easing: MOLLA }); }
     b.disabled = false;
   }, 650);
@@ -862,7 +869,7 @@ function impostazioni() {
     ${installata ? "" : `<div class="tip" style="margin-top:14px"><b>Usala come un'app</b>In Safari tocca Condividi, poi "Aggiungi alla schermata Home". Così si apre a tutto schermo, anche senza rete.</div>`}
     <div class="block-h">Chi cura le piante</div>
     <div class="group nomi">
-    <label class="campo-nome"><span class="chi-tag" style="--t:${TINTE_CHI[0]}">${esc(iniziale(nomeIo() || "Tu"))}</span><input id="n-io" value="${esc(nomeIo())}" placeholder="Il tuo nome" maxlength="24" autocomplete="given-name" aria-label="Il tuo nome"></label>
+    <label class="campo-nome"><span class="chi-tag" style="--t:${TINTE_CHI[0]}">${nomeIo() ? esc(iniziale(nomeIo())) : "+"}</span><input id="n-io" value="${esc(nomeIo())}" placeholder="Il tuo nome" maxlength="24" autocomplete="given-name" aria-label="Il tuo nome"></label>
     <label class="campo-nome"><span class="chi-tag" style="--t:${TINTE_CHI[1]}">${nomeAiuto() ? esc(iniziale(nomeAiuto())) : "+"}</span><input id="n-aiuto" value="${esc(nomeAiuto())}" placeholder="Chi ti aiuta (facoltativo)" maxlength="24" autocomplete="off" aria-label="Chi ti aiuta"></label>
     </div>
     <p class="note" style="margin-top:6px">Con due nomi, nella scheda Oggi scegli chi annaffia: ogni annaffiatura ricorda chi l'ha fatta.</p>
@@ -880,7 +887,7 @@ function impostazioni() {
       <input type="file" id="b-file" accept="application/json,.json" hidden>
       <div id="b-conf"></div>
     </div>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.4 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.5 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `);
   const nomeCambiato = (id, k) => { const el = $(id); el.onchange = () => {
     imp[k] = pulisciNome(el.value); el.value = imp[k]; if (!nomeAiuto()) imp.chi = "io";
