@@ -887,7 +887,7 @@ function impostazioni() {
       <input type="file" id="b-file" accept="application/json,.json" hidden>
       <div id="b-conf"></div>
     </div>
-    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.5 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
+    <p class="about"><img src="logo.svg" alt="" class="logo-mini"><br>Rigo · <i>“io annaffio”</i> · versione 6.5.1 · ${piante.length} ${piante.length === 1 ? "pianta" : "piante"}</p>
   `);
   const nomeCambiato = (id, k) => { const el = $(id); el.onchange = () => {
     imp[k] = pulisciNome(el.value); el.value = imp[k]; if (!nomeAiuto()) imp.chi = "io";

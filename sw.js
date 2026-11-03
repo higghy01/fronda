@@ -1,10 +1,11 @@
 /* Copia dell'app sul telefono: si apre anche senza rete.
    A ogni modifica dei file alzare VERSIONE, altrimenti il telefono resta sulla vecchia. */
-const VERSIONE = "fronda-v18";
-const FILE = ["./", "index.html", "stile.css?v=12", "config.js?v=12", "cure.js?v=12", "salute.js?v=12", "disegni.js?v=12", "app.js?v=12", "manifest.json", "icona-180.png", "icona-512.png", "logo.svg"];
+const VERSIONE = "fronda-v19";
+const FILE = ["./", "index.html", "stile.css?v=19", "config.js?v=19", "cure.js?v=19", "salute.js?v=19", "disegni.js?v=19", "app.js?v=19", "manifest.json", "icona-180.png", "icona-512.png", "logo.svg"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSIONE).then(c => c.addAll(FILE)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
-  e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n !== VERSIONE).map(n => caches.delete(n)))).then(() => self.clients.claim()));
+  // solo le copie di Rigo: sullo stesso indirizzo (higghy01.github.io) ci sono anche altre app con le loro copie
+  e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n.startsWith("fronda-") && n !== VERSIONE).map(n => caches.delete(n)))).then(() => self.clients.claim()));
 });
 self.addEventListener("fetch", e => {
   const u = new URL(e.request.url);
