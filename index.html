@@ -21,6 +21,20 @@
 <link rel="stylesheet" href="stile.css?v=19">
 </head>
 <body>
+<!-- 09/11/2026: Rigo si è spostata (questa resta aperta solo per guardare le piante già segnate) -->
+<input type="checkbox" id="sposta-x" hidden>
+<div class="spostata" role="note">
+  <label for="sposta-x" class="spostata-x" aria-label="Chiudi">✕</label>
+  <b>Rigo si è spostata</b> su <a href="https://rigo-piante.web.app/">rigo-piante.web.app</a>.<br>
+  Apri il nuovo indirizzo con Safari, mettilo sulla Home (Condividi → Aggiungi alla schermata Home) e riattiva il promemoria del mattino. Poi cancella questa icona.
+</div>
+<style>
+  .spostata { position: fixed; z-index: 90; left: 12px; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 10px); padding: 12px 38px 12px 14px; border-radius: 16px;
+    background: #FFF4CC; color: #3D3000; font: 14px/1.4 -apple-system, system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+  .spostata a { color: #7A4B00; font-weight: 700; }
+  .spostata-x { position: absolute; top: 6px; right: 10px; font-size: 18px; padding: 4px; cursor: pointer; }
+  #sposta-x:checked + .spostata { display: none; }
+</style>
 <div class="navbar" id="navbar" aria-hidden="true"><span id="nav-t"></span></div>
 <div class="app" id="app">
   <div class="vista on" id="v-oggi" role="tabpanel" aria-label="Oggi"></div>
